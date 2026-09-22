@@ -1,0 +1,22 @@
+{
+  "name": "jey-contracts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Jey public boundary types. No DSH, Cordis or provider imports belong here.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "src"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "echo \"no tests: type-only package\" && exit 0",
+    "test:property": "echo \"no tests: type-only package\" && exit 0"
+  }
+}
