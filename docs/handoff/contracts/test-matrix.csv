@@ -1,0 +1,75 @@
+id,gate,evidence_kind,priority,case,setup,expected,status
+HOST-01,host-integration,host,P0,真实 Launcher 加载,固定 DSH、临时 home、构建产物,使用 dsh profile 启动，插件 active；不是直接调用 handler,NOT_RUN
+HOST-02,host-integration,host,P0,真实原生调用,测试模型适配器驱动真实 loop,tool/call、pre、guard、body、final、tool/result 顺序可追踪,NOT_RUN
+HOST-03,host-integration,host,P0,组装时序,捕获 system-prompt assembly 与 pre-step,证明顺序；实际发送 schema 与记录一致,NOT_RUN
+HOST-04,host-integration,host,P0,最终输入改写,前后 listener 改写 enter messages,决策使用受支持组合的最终输入，不用旧 payload 替代,NOT_RUN
+HOST-05,host-integration,host,P0,宿主拒绝保持,宿主 deny；模型回答无冲突,body 次数为零；deny 保持,NOT_RUN
+HOST-06,host-integration,host,P0,宿主审批保持,宿主 ask；模型回答无冲突,未审批 body=0；审批仅适用于冻结的当前调用,NOT_RUN
+HOST-07,host-integration,host,P0,无审批服务,保护模式需 ask 且无审批服务,不能执行；返回明确失败而不是 allow,NOT_RUN
+HOST-08,host-integration,host,P0,作用域同名工具,全局与 scoped 同名但 schema 不同,读取/执行身份一致；不从全局取错 definition,NOT_RUN
+HOST-09,host-integration,host,P0,已有可见性约束,宿主已隐藏一个工具,建议/恢复不能把该工具重新加入,NOT_RUN
+HOST-10,host-integration,host,P0,嵌套工具传输,PTC transport 包含两个子调用,每个应检查的调用走真实 pipeline；副作用不漏计、不重计,NOT_RUN
+HOST-11,host-integration,host,P0,无 agent 的受保护调用,可信测试程序经工具 registry 调用,不通过缺少 agent 跳过必需检查,NOT_RUN
+HOST-12,host-integration,host,P0,热替换后恢复,插件配置改变并卸载重装,仅移除自己的注册，不删别的插件状态,NOT_RUN
+HOST-13,host-integration,host,P0,异常最终结果,工具/renderer/post listener 分别抛错,最终冻结错误被观测；不虚构成功,NOT_RUN
+HOST-14,host-integration,host,P0,插件次序组合,交换支持的审批/评估 listener 顺序,必需 ask 不丢失；不支持组合明确禁用 enforce,NOT_RUN
+POL-01,property,property,P0,动作合并全表,遍历 host 4种 × ADL4种,符合规格；无 allow 升级路径,NOT_RUN
+POL-02,property,property,P0,重复合并幂等,生成动作/原因集合,重复应用不增加权限或重复无限原因,NOT_RUN
+POL-03,property,property,P0,硬规则不依赖模型,提供方不可用且硬 deny 命中,deny 确定；不请求网络,NOT_RUN
+POL-04,property,property,P0,必需问题缺失,随机删掉必要题结果,必需检查转 ask/失败；不能默认为 true,NOT_RUN
+POL-05,property,property,P0,快照过期,变更 task/policy/generation/call/catalog 任一身份,旧观测不得发布动作,NOT_RUN
+POL-06,property,property,P0,预算并发预留,并发请求多于剩余配额,真正启动数不超过预算；每次重试单独计费计数,NOT_RUN
+WIRE-01,provider-contract,contract,P0,逐题身份校验,响应重复/未知题 ID,拒绝或明确 partial；不按数组位置误配,NOT_RUN
+WIRE-02,provider-contract,contract,P0,概率边界,NaN/Infinity/负数/大于1/错误总和,边界校验拒绝；不存在强制归一化掩盖响应损坏,NOT_RUN
+WIRE-03,provider-contract,contract,P0,Noul 语义,合法二元结果没有 confidence,保留 pYes；不捏造独立 confidence,NOT_RUN
+WIRE-04,provider-contract,contract,P0,Score 语义,四个有序等级和分布,expectedIndex 在0..3；不误称全为0..1风险,NOT_RUN
+WIRE-05,provider-contract,contract,P0,认证错误,HTTP401,不自动重试，不切换其他key,NOT_RUN
+WIRE-06,provider-contract,contract,P0,限流退避,HTTP429/529 加 deadline,预算内单层退避；超时转明确错误,NOT_RUN
+WIRE-07,provider-contract,contract,P0,跨域重定向,服务端返回302外部地址,不跟随；不外泄 Authorization,NOT_RUN
+WIRE-08,provider-contract,contract,P0,超大响应,分块流超过 body 限制,及时中断，不无限 readAll,NOT_RUN
+WIRE-09,provider-contract,contract,P0,部分失败,批量含可答题与unsupported题,逐题状态保留；策略识别必要题缺失,NOT_RUN
+WIRE-10,provider-contract,contract,P0,显式 Mock,有云key环境但选择mock,仍synthetic；零网络；不隐式选live,NOT_RUN
+SEC-01,security,security,P0,外发默认关闭,shadow+cloud 配置但egress deny,外部请求数为0；明确 EGRESS_DENIED,NOT_RUN
+SEC-02,security,security,P0,不可信工具描述,候选文本要求修改 endpoint/策略,不更改配置、授权、问题模板或密钥来源,NOT_RUN
+SEC-03,security,security,P0,参数秘密,参数含token/password和未知格式秘密,允许字段最小化；known形状脱敏；明示不能保证任意秘密识别,NOT_RUN
+SEC-04,security,security,P0,上下文裁剪,限制放在长中文输入末尾,保留限制或 insufficient，不静默删掉关键约束,NOT_RUN
+SEC-05,security,security,P0,跨会话隔离,相同问题但不同workspace/政策,缓存/状态不得跨scope复用,NOT_RUN
+SEC-06,security,security,P0,本地服务认证,无token/错误token/恶意Origin,保护端点拒绝；无通配CORS、无管理API暴露,NOT_RUN
+SEC-07,security,security,P0,未知配置,未知字段/非法阈值/mock enforce,启动失败清楚；不silent fallback,NOT_RUN
+SEC-08,security,security,P0,原始日志默认禁用,含敏感输入完成一轮,公共报告不包含原始用户内容/凭据/私有路径,NOT_RUN
+SEC-09,security,security,P0,权限范围绕过,低权限策略+模型建议高权限工具,建议不是授权；宿主硬约束仍生效,NOT_RUN
+LIFE-01,lifecycle,lifecycle,P0,用户中途取消,模型服务仍在等待,abort传播；迟到回答不应用；body未开始则不执行,NOT_RUN
+LIFE-02,lifecycle,lifecycle,P0,排队超时,队列堵塞且新请求短deadline,排队耗时计入总时限；过期不启动推理,NOT_RUN
+LIFE-03,lifecycle,lifecycle,P0,有界队列,请求超过并发和排队上限,QUEUE_FULL；内存不无界增长,NOT_RUN
+LIFE-04,lifecycle,lifecycle,P0,取消的GPU任务,后端报告discard-only,废弃回答；安全点回收或受控重启，不谎称内核已停止,NOT_RUN
+LIFE-05,lifecycle,lifecycle,P0,卸载在途任务,dispose时有排队/执行请求,所有owned任务结算，监听器/连接回收,NOT_RUN
+LIFE-06,lifecycle,lifecycle,P0,外部服务所有权,external server 模式卸载插件,不关闭用户独立服务,NOT_RUN
+LIFE-07,lifecycle,lifecycle,P0,自己引发工具变化,应用建议/掩码触发change,无自我失效死循环；无关agent不被反复判stale,NOT_RUN
+LIFE-08,lifecycle,lifecycle,P0,反馈去重,同turn不断产生相同建议,不重复inject导致永不结束,NOT_RUN
+LIFE-09,lifecycle,lifecycle,P0,轮询与重复失败,正常job轮询、无进展失败各一组,正常poll按poll预算；失败达到规则后暂停但可恢复,NOT_RUN
+LIFE-10,lifecycle,lifecycle,P0,最终结果同步事件,tools/result高频调用,回调只有限同步更新；异步worker受控且报错可见,NOT_RUN
+LOCAL-01,local-inference,local-live,P1,加载真实权重,授权模型文件+固定tokenizer,synthetic=false，实际模型hash和输出存在,NOT_RUN
+LOCAL-02,local-inference,local-live,P1,预热与常驻,连续执行两批请求,模型非每次重新加载；报告冷/热分开,NOT_RUN
+LOCAL-03,local-inference,local-live,P1,缺失模型,移走测试模型文件或错误revision,readiness失败；不自行下载/切换mock,NOT_RUN
+LOCAL-04,local-inference,local-live,P1,选项编码,标签在目标模板下tokenize,不把多token选项第一token当完整序列,NOT_RUN
+LOCAL-05,local-inference,local-live,P1,相互不互斥的工具,同时相关的两工具,独立相关性判断；不误用互斥Choice topK,NOT_RUN
+OFF-01,local-offline,offline-live,P1,真实断外网,本地模型/tokenizer预置；OS层禁止外网,实际推理成功；阻断测试能捕捉外连；不是仅检查localhost,NOT_RUN
+OFF-02,local-offline,offline-live,P1,离线依赖未预置,移除缓存tokenizer文件,明确失败，禁止自动下载或代理云,NOT_RUN
+MCP-01,mcp-contract,mcp,P1,真实客户端握手,stdio server+独立SDK客户端,initialize/list/call走真实协议,NOT_RUN
+MCP-02,mcp-contract,mcp,P1,stdout纯净,启动/错误/模型日志高频输出,stdout仅协议，stderr承载日志,NOT_RUN
+MCP-03,mcp-contract,mcp,P1,结构化错误,非法参数与推理失败各一例,协议错误/工具错误区分；structuredContent与文本一致,NOT_RUN
+MCP-04,mcp-contract,mcp,P1,权限隔离,请求伪造host-attested身份,只能决策工具，不能改策略或执行宿主其他工具,NOT_RUN
+MCP-05,mcp-contract,mcp,P1,客户端断开,调用在途时关闭客户端,owned任务取消；没有孤儿进程,NOT_RUN
+PACK-01,pack-install,package,P0,全新tarball安装,没有源码路径的临时home,从构建包启动和调用；没有workspace依赖逃逸,NOT_RUN
+PACK-02,pack-install,package,P0,版本不匹配,安装未验证DSH版本,doctor明确报告；不宣称兼容,NOT_RUN
+PACK-03,pack-install,package,P0,卸载及回滚,安装A、升级B、回滚A,只改owned条目；原会话/其他插件完整,NOT_RUN
+PACK-04,pack-install,package,P0,包白名单,构建目录含.env和模型文件,安装包/证据均不包含敏感或巨大文件,NOT_RUN
+PACK-05,pack-install,package,P0,构建身份,测试包与待上传包hash不同,禁止使用旧PASS发布新包,NOT_RUN
+EVAL-01,semantic-eval,evaluation-live,P1,冻结数据,训练/校准/测试分组锁定,同任务变体不跨split；hash记录,NOT_RUN
+EVAL-02,semantic-eval,evaluation-live,P1,中文与扰动,中英、换序、无适用选项、证据不足,分组报告；不删掉困难样本,NOT_RUN
+EVAL-03,semantic-eval,evaluation-live,P1,独立校准,只用calibration分区拟合,test集不调阈值，raw概率与calibrated分开,NOT_RUN
+EVAL-04,semantic-eval,evaluation-live,P1,真实标签,任务可验证标准+人工复核,不以被测模型自己或Jev为唯一真值,NOT_RUN
+SYS-01,system-eval,evaluation-live,P1,真实重新规划,同任务多个独立live runs,报告最终完成率；固定轨迹replay单独列,NOT_RUN
+SYS-02,system-eval,evaluation-live,P1,公平基线,同host/规划模型/工具权限/任务预算,规则基线与无ADL基线均存在,NOT_RUN
+SYS-03,system-eval,evaluation-live,P1,真实总成本,包括预处理、排队、失败和重试,成本未知null；冷/热及缓存命中分别报告,NOT_RUN
+SYS-04,system-eval,evaluation-live,P1,统计判定,预注册指标/置信区间/足够样本,数据不足INCONCLUSIVE；不只挑最好run,NOT_RUN

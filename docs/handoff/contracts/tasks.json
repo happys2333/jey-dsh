@@ -1,0 +1,228 @@
+{
+  "schemaVersion": "1",
+  "project": "agent-decision-layer",
+  "isExecutionResult": false,
+  "status": "NOT_STARTED",
+  "milestones": [
+    {
+      "id": "M0",
+      "dependsOn": [],
+      "title": "环境和真实 DSH 合同探针",
+      "status": "TODO",
+      "requiredDeliverables": [
+        "docs/HOST_CONTRACT.md",
+        "artifacts/compatibility.json",
+        "artifacts/environment.json"
+      ],
+      "gates": [
+        "compatibility"
+      ],
+      "rules": [
+        "do not report PASS without actual evidence",
+        "continue independent work when external capability is blocked"
+      ]
+    },
+    {
+      "id": "M1",
+      "dependsOn": [
+        "M0"
+      ],
+      "title": "公共类型、纯策略、边界校验",
+      "status": "TODO",
+      "requiredDeliverables": [
+        "packages/contracts",
+        "packages/core",
+        "config.schema.json"
+      ],
+      "gates": [
+        "typecheck",
+        "unit",
+        "property"
+      ],
+      "rules": [
+        "do not report PASS without actual evidence",
+        "continue independent work when external capability is blocked"
+      ]
+    },
+    {
+      "id": "M2",
+      "dependsOn": [
+        "M1"
+      ],
+      "title": "DSH 最小原生闭环",
+      "status": "TODO",
+      "requiredDeliverables": [
+        "packages/adapter-dsh",
+        "tests/host",
+        "docs/INSTALL_DSH.md"
+      ],
+      "gates": [
+        "host-integration",
+        "lifecycle"
+      ],
+      "rules": [
+        "do not report PASS without actual evidence",
+        "continue independent work when external capability is blocked"
+      ]
+    },
+    {
+      "id": "M3",
+      "dependsOn": [
+        "M1",
+        "M0"
+      ],
+      "title": "真实本地和官方提供方",
+      "status": "TODO",
+      "requiredDeliverables": [
+        "packages/provider-typesafe",
+        "packages/provider-local",
+        "python/local_decider",
+        "models.lock.json"
+      ],
+      "gates": [
+        "provider-contract",
+        "local-inference",
+        "local-offline",
+        "cloud-inference"
+      ],
+      "rules": [
+        "do not report PASS without actual evidence",
+        "continue independent work when external capability is blocked"
+      ]
+    },
+    {
+      "id": "M4",
+      "dependsOn": [
+        "M1",
+        "M2"
+      ],
+      "title": "MCP 和工具建议",
+      "status": "TODO",
+      "requiredDeliverables": [
+        "packages/adapter-mcp",
+        "tests/mcp",
+        "docs/INSTALL_MCP.md"
+      ],
+      "gates": [
+        "mcp-contract"
+      ],
+      "rules": [
+        "do not report PASS without actual evidence",
+        "continue independent work when external capability is blocked"
+      ]
+    },
+    {
+      "id": "M5",
+      "dependsOn": [
+        "M2",
+        "M3",
+        "M4"
+      ],
+      "title": "安全、并发、故障注入",
+      "status": "TODO",
+      "requiredDeliverables": [
+        "SECURITY.md",
+        "tests/security",
+        "tests/lifecycle"
+      ],
+      "gates": [
+        "security",
+        "lifecycle",
+        "secret-scan"
+      ],
+      "rules": [
+        "do not report PASS without actual evidence",
+        "continue independent work when external capability is blocked"
+      ]
+    },
+    {
+      "id": "M6",
+      "dependsOn": [
+        "M3",
+        "M4",
+        "M5"
+      ],
+      "title": "真实语义和系统对照",
+      "status": "TODO",
+      "requiredDeliverables": [
+        "eval/protocol.json",
+        "eval/dataset.lock.json",
+        "artifacts/eval"
+      ],
+      "gates": [
+        "baseline-eval",
+        "semantic-eval",
+        "system-eval"
+      ],
+      "rules": [
+        "do not report PASS without actual evidence",
+        "continue independent work when external capability is blocked"
+      ]
+    },
+    {
+      "id": "M7",
+      "dependsOn": [
+        "M2",
+        "M4",
+        "M5"
+      ],
+      "title": "构建包、全新安装和 CI",
+      "status": "TODO",
+      "requiredDeliverables": [
+        ".github/workflows",
+        "artifacts/packages",
+        "dependency-report.json"
+      ],
+      "gates": [
+        "pack-install"
+      ],
+      "rules": [
+        "do not report PASS without actual evidence",
+        "continue independent work when external capability is blocked"
+      ]
+    },
+    {
+      "id": "M8",
+      "dependsOn": [
+        "M6",
+        "M7"
+      ],
+      "title": "授权上传和最终回传",
+      "status": "TODO",
+      "requiredDeliverables": [
+        "FINAL_REPORT_CN.md",
+        "evidence.manifest.json",
+        "delivery-plan.json"
+      ],
+      "gates": [],
+      "rules": [
+        "do not report PASS without actual evidence",
+        "continue independent work when external capability is blocked"
+      ]
+    }
+  ],
+  "externalPrerequisites": {
+    "local-inference": [
+      "authorized model weights available",
+      "sufficient working backend and hardware"
+    ],
+    "local-offline": [
+      "model/tokenizer preloaded",
+      "OS/container outbound denial verified"
+    ],
+    "cloud-inference": [
+      "explicit egress permission",
+      "credential",
+      "explicit spend/call budget"
+    ],
+    "upload": [
+      "explicit target and operations authorized",
+      "authenticated write access"
+    ]
+  },
+  "releaseDependency": "M7 can finish packaging before M6 quality finishes; local-qualified requires all applicable M0-M7 gates",
+  "notes": [
+    "docs milestones describe sequential reading order; independent implementation work may follow this DAG",
+    "M8 builds local collection packages even when upload or model-quality gates are BLOCKED"
+  ]
+}

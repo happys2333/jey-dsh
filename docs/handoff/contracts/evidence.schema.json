@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ADL evidence declaration v1",
+  "description": "Proposed evidence schema. Passing validates declarations, not truth. Cross-field/profile/path/hash checks use validate_evidence.py.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "project",
+    "run_id",
+    "created_at",
+    "source",
+    "artifacts",
+    "gates"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1"
+    },
+    "project": {
+      "const": "agent-decision-layer"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "commit",
+        "dirty"
+      ],
+      "properties": {
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "dirty": {
+          "type": "boolean"
+        }
+      }
+    },
+    "providers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "synthetic",
+          "model"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "mock",
+              "local",
+              "typesafe"
+            ]
+          },
+          "synthetic": {
+            "type": "boolean"
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "path",
+          "classification",
+          "size_bytes",
+          "sha256"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "classification": {
+            "const": "public"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "gates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "kind",
+          "artifact_ids"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "BLOCKED",
+              "SKIPPED",
+              "INCONCLUSIVE"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "host",
+              "static",
+              "unit",
+              "property",
+              "contract",
+              "mcp",
+              "security",
+              "lifecycle",
+              "package",
+              "simulation",
+              "local-live",
+              "offline-live",
+              "cloud-live",
+              "evaluation-live"
+            ]
+          },
+          "exit_code": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "artifact_ids": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "provider_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

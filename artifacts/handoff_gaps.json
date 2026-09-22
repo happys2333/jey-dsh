@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "1",
+  "checkedOn": "2026-09-22",
+  "package": "ADL x DSH handoff drop",
+  "verification": {
+    "method": "sha256sum -c against the package's own SHA256SUMS.txt",
+    "declared": 25,
+    "verified": 19,
+    "missing": 6,
+    "tampered": 0,
+    "note": "The drop arrived with every filename rotated by one position relative to its content (e.g. the file named 01_TECHNICAL_SPEC_CN.md held contracts/tasks.json). All 20 delivered files matched a declared hash exactly, so the mapping was reconstructed by hash and re-laid out; no content was edited. SHA256SUMS.txt itself is legitimately not self-listed."
+  },
+  "missingFiles": [
+    { "path": "tests/test_evidence_tools.py", "impact": "45 of the claimed 53 self-tests cannot be re-run here" },
+    { "path": "tests/test_bundle_contracts.py", "impact": "8 contract-consistency tests cannot be re-run here" },
+    { "path": "tests/HANDOFF_SELF_TEST_OUTPUT.txt", "impact": "raw evidence behind HANDOFF_VALIDATION.md 'PASS, 53 tests' is unverifiable in this workspace" },
+    { "path": "templates/adl.config.example.json", "impact": "config schema defaults and the config-vs-docs sync test (spec 13) must be authored from scratch" },
+    { "path": "templates/evidence.manifest.template.json", "impact": "M8 evidence manifest shape must be authored from contracts/evidence.schema.json alone" },
+    { "path": "templates/upload-plan.example.json", "impact": "M8 upload plan shape must be derived from docs/04" }
+  ],
+  "consequences": [
+    "The handoff's claim 'python -m unittest discover -s tests → PASS 53 tests' is recorded as NOT_VERIFIABLE here, not as PASS.",
+    "scripts/validate_evidence.py and scripts/pack_evidence.py were delivered but the Python interpreter they require is absent from this machine, so neither script has been executed in this workspace. Both remain unproven until Python is installed.",
+    "The four missing templates are the artifacts the spec expects downstream gates to consume; they are in-scope work for M1/M8, not prerequisites we can wait on."
+  ],
+  "recoveryAttempted": {
+    "method": "gh search code for evidence.manifest.template.json, test_bundle_contracts.py, agent-decision-layer/pack_evidence",
+    "result": "no public origin repository found; the package appears to have been authored in-conversation rather than published",
+    "date": "2026-09-22"
+  },
+  "decisions": [
+    "Proceed: reconstruct the missing tests and templates as first-class project work under packages/*/tests and templates/, and label them as re-authored, not inherited.",
+    "Do not cite the handoff self-test result as evidence for any ADL gate."
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "1",
+  "checkedOn": "2026-09-22",
+  "scope": "documentation baseline; not dependency installation lock",
+  "repositories": [
+    {
+      "id": "dsh",
+      "repository": "deepseek-ai/deepseek-harness",
+      "ref": "c36a83ff6bb95e3f82cf79f9be7c724270a8aa61",
+      "declared_version": "0.1.7-alpha.1",
+      "role": "host-compatibility-baseline",
+      "verification": "source-read; runtime not tested"
+    },
+    {
+      "id": "semif",
+      "repository": "TheoLeeCJ/SemIf",
+      "ref": "1f2dea3e25379f9dfc98cb83c324f00ab5deda37",
+      "declared_version": null,
+      "role": "candidate-local-scoring-backend",
+      "verification": "source-read; inference not tested"
+    },
+    {
+      "id": "reference-dsh-jev",
+      "repository": "buberlo/dsh-jev",
+      "ref": "d2f77a1f68906d1576caaa8aa22be65913905d19",
+      "declared_version": null,
+      "role": "review-only; not an implementation dependency",
+      "verification": "targeted source reading; risks not reproduced"
+    }
+  ],
+  "protocolReferences": [
+    {
+      "id": "typesafe",
+      "url": "https://docs.typesafe.ai/api",
+      "checkedOn": "2026-09-22",
+      "immutableSnapshotAvailable": false
+    },
+    {
+      "id": "mcp",
+      "url": "https://modelcontextprotocol.io/specification/2025-11-25/server/tools",
+      "version": "2025-11-25"
+    }
+  ],
+  "mustResolveAtM0": [
+    "actual published DSH package and Cordis peer versions",
+    "Node/pnpm/Python exact versions and dependency lock hashes",
+    "model/tokenizer/quantization revisions and license",
+    "local backend API and cancellation behavior"
+  ],
+  "implementationVerification": "NOT_RUN"
+}
