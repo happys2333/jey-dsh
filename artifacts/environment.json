@@ -1,0 +1,84 @@
+{
+  "schemaVersion": "1",
+  "purpose": "M0 environment record for jey-dsh (ADL) host compatibility probe",
+  "checkedOn": "2026-09-22",
+  "isExecutionResult": true,
+  "host": {
+    "product": "DSH (deepseek-harness)",
+    "upstream": "https://github.com/deepseek-ai/deepseek-harness",
+    "pinnedCommit": "c36a83ff6bb95e3f82cf79f9be7c724270a8aa61",
+    "pinnedCommitSubject": "Merge pull request #4901 from deepseek-harness/rel/dsh-0.1.7-alpha.1",
+    "pinnedCommitDate": "2026-09-22T04:12:33Z",
+    "rootPackage": "@deepseek-ai/dsh-root",
+    "version": "0.1.7-alpha.1",
+    "nodeEngines": "^22.19.0 || >=24.0.0",
+    "publishedToNpm": true,
+    "npmDistTags": { "latest": "0.1.5-rc.2", "next": "0.1.5-rc.3", "alpha": "0.1.7-alpha.1" }
+  },
+  "localRuntime": {
+    "platform": "win32",
+    "osVersion": "10.0.26200",
+    "arch": "x64",
+    "shell": "Git Bash /usr/bin/bash",
+    "node": "v24.15.0",
+    "nodeSatisfiesDshEngines": true,
+    "npm": "11.12.1",
+    "pnpm": "NOT_INSTALLED",
+    "git": "2.54.0.windows.1",
+    "python": "NOT_INSTALLED",
+    "uv": "0.11.32",
+    "packageManagerGap": "DSH docs and handoff commands assume pnpm; pnpm is absent and must be enabled via corepack before M1"
+  },
+  "checks": [
+    {
+      "id": "ENV-01",
+      "command": "git ls-remote https://github.com/happys2333/jey-dsh.git",
+      "result": "PASS",
+      "note": "remote exists, single ref refs/heads/main at cfab33b1d3d710f1b6ffdabb031090294a1b8595"
+    },
+    {
+      "id": "ENV-02",
+      "command": "git ls-remote git@github.com:happys2333/jey-dsh.git",
+      "result": "FAIL",
+      "note": "Permission denied (publickey). Local id_ed25519 is not registered on GitHub; gh CLI is authenticated as happys2333 over HTTPS with repo scope, so all git operations use HTTPS."
+    },
+    {
+      "id": "ENV-03",
+      "command": "node --version",
+      "result": "PASS",
+      "note": "v24.15.0 satisfies DSH engines; unlike the handoff author environment (Node 22.16.0, below the 22.19 floor), a real host probe is not blocked here"
+    },
+    {
+      "id": "ENV-04",
+      "command": "npm view @deepseek-ai/dsh dist-tags",
+      "result": "PASS",
+      "note": "0.1.7-alpha.1 published under tag alpha"
+    },
+    {
+      "id": "ENV-05",
+      "command": "npm install --dry-run @deepseek-ai/dsh@0.1.7-alpha.1",
+      "result": "PASS",
+      "note": "resolved 512 packages, no peer conflicts; @deepseek-ai/cordis resolved to 4.0.3 which is published though dist-tag latest is 4.0.2"
+    },
+    {
+      "id": "ENV-06",
+      "command": "sha256sum -c docs/handoff/SHA256SUMS.txt",
+      "result": "PARTIAL",
+      "note": "19 of 25 declared files verified; 6 declared files were absent from the drop"
+    },
+    {
+      "id": "ENV-07",
+      "command": "gh api repos/deepseek-ai/deepseek-harness/commits/c36a83ff... ; same for TheoLeeCJ/SemIf@1f2dea3e and buberlo/dsh-jev@d2f77a1f",
+      "result": "PASS",
+      "note": "all three pinned upstream commits exist with the dates the handoff recorded"
+    }
+  ],
+  "notChecked": [
+    "真实 DSH 进程加载本插件的 smoke 探针",
+    "DSH 原生安装 (@deepseek-ai/dsh 实装而非 dry-run)",
+    "SemIf 权重下载与断网推理",
+    "Jev 真实凭据调用",
+    "GPU/CUDA/Apple 平台后端",
+    "npm 名称可用性"
+  ]
+}
