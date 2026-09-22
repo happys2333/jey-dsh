@@ -1,0 +1,5 @@
+# 全仓库统一 LF：docs/handoff/SHA256SUMS.txt 按字节哈希，
+# 换行符被规范化会让交接包自检静默失败。
+* text=auto eol=lf
+*.png binary
+*.gguf binary

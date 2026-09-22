@@ -1,0 +1,22 @@
+{
+  "name": "jey-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Jey for DSH — a verifiable decision layer for an existing agent host. Workspace root; nothing here is published yet.",
+  "type": "module",
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:property": "pnpm -r test:property",
+    "verify": "pnpm typecheck && pnpm test && pnpm test:property"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.1",
+    "typescript": "5.9.3"
+  }
+}
