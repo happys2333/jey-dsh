@@ -44,3 +44,15 @@ export {
 } from './progress.ts'
 
 export { canonicalJson, digestJson, sha256, utf8Bytes } from './canonical.ts'
+
+export {
+  assertSupported,
+  assessmentState,
+  compileAssessment,
+  compileRelevance,
+  ASSESSMENT_QUESTION_IDS,
+  RELEVANCE_TEMPLATE_VERSION,
+  TEMPLATE_VERSION,
+  UnsupportedCapability,
+  type AssessmentFacts,
+} from './questions.ts'

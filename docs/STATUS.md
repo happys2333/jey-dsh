@@ -25,7 +25,7 @@
 ```sh
 pnpm install                 # 5 包，成功
 pnpm -r typecheck            # 0 error（strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes）
-pnpm --filter jey-core test          # 67 tests, 67 pass, 0 fail
+pnpm --filter jey-core test          # 73 tests, 73 pass, 0 fail
 pnpm --filter jey-core test:property # 16 properties, 16 pass, 0 fail
 ```
 
@@ -34,8 +34,8 @@ pnpm --filter jey-core test:property # 16 properties, 16 pass, 0 fail
 | typecheck | **PASS** | contracts + core，无 `any` 兜底，无 `@ts-ignore` |
 | unit | **PASS** | 策略表 1 全 16 格、absorbing 行、硬规则、取消优先、必需题缺失、未校准不得 deny、陈旧快照、off/shadow 惰性；外发 deny 默认、local-only 精确 origin、allowlist 五条件、调用方不得指定传输参数；边界校验的路径收集 |
 | property | **PASS** | Jey 永不放宽宿主决定；`allow` 结果只可能来自 `allow`+`abstain`；shadow/off 惰性；无观测时 enforce 不 abstain；放行必经已配置 origin/destination |
-| 已实现模块 | — | `policy.ts`（§7.2 两张表）、`egress.ts`（§5.3）、`validate.ts`（§6.1 边界校验）、`snapshot.ts`（§4.2/§10.1 摘要绑定与新鲜度）、`truncation.ts`（§5.2 字节预算裁剪）、`progress.ts`（§9 无进展检测）、`canonical.ts`（稳定摘要） |
-| 未开始 | **NOT_RUN** | `QuestionCompiler`（固定模板版本化）、`DecisionCoordinator`（§4.4/§10 状态机与队列）、DSH schema 子集映射、`config.schema.json` |
+| 已实现模块 | — | `policy.ts`（§7.2 两张表）、`egress.ts`（§5.3）、`validate.ts`（§6.1 边界校验）、`snapshot.ts`（§4.2/§10.1 摘要绑定与新鲜度）、`truncation.ts`（§5.2 字节预算裁剪）、`progress.ts`（§9 无进展检测）、`questions.ts`（§7.1 固定模板与能力预检）、`canonical.ts`（稳定摘要） |
+| 未开始 | **NOT_RUN** | `DecisionCoordinator`（§4.4/§10 状态机与队列）、DSH schema 子集映射、`config.schema.json` |
 
 ## 过程中发现并修掉的真实缺陷
 
