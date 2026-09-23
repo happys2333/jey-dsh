@@ -119,11 +119,56 @@ export interface LlmCallConfig { provider; model; reasoningEffort?; temperature?
 
 `modelcontextprotocol.io/specification/2025-11-25/server/tools` 存在且核实（`inputSchema` 必填、`outputSchema` 可选、结构化结果在 `structuredContent`；协议错误用 JSON-RPC 码如 `-32602`，工具执行错误用 `isError: true`）。但已发布日期版本含 **`2026-07-28`（current）**，`2025-11-25` 已被取代。→ 需要 ADR 决定固定哪一版；本文件先按交接包指定的 `2025-11-25` 实现并记录差异。
 
-## 10. M0 gate 状态
+## 10. 真实运行时探针结果（M0 已执行）
+
+`packages/adapter-dsh` 用已发布的 `@deepseek-ai/dsh-agent-loop-testkit` 装配真实
+Cordis 上下文 + 真实 `ToolRuntime` + 真实生产 `AgentLoop`，只有 LLM 换成脚本驱动器；
+全程离线、无密钥。证据在 `artifacts/compatibility.json`，其中事件序列可用
+`JEY_TRACE_FILE=<path> pnpm --filter jey-adapter-dsh test` 重放并逐字节比对。
+
+单轮两步实测顺序：
+
+```text
+assemble → pre-step → llm-request → pre-execute → pre-execute-decision
+        → guard → execute → post-execute → result → assemble → pre-step → llm-request
+```
+
+已证实（PASS，7 个测试）：
+
+- 第 4 节的 R-01 顺序在**运行时**成立，不再只是源码推断：`assemble` 严格早于 `pre-step`。
+- 模型可见工具集只来自 `PromptAssembly.tools`；同一 assembly 投影到 request 头的工具集逐项相等。
+- `tools/pre-execute` 返回 `deny` 后工具体不执行，模型读到 `Error: probe-policy-denied`，序列中无 `execute`。
+- 同步 `guard()` 的拒绝压过内层 waterfall 的 `allow`：`pre-execute-decision:allow` 仍不执行；且 `guard` 位置在 `pre-execute` 之后，与源码注释“guard 在可扩展 waterfall 之后”一致。
+- `tools/result` 的 `exec`、`result`、`result.content` 全部冻结，两次就地写入都抛 `TypeError`，模型可见值不变。
+- 冻结参数在 `pre-execute` 处可见且不可变。
+
+未证实与降级（如实记录）：
+
+- **`ask` 的授予 BLOCKED**：注册表经 `ctx.get('approval')` 解析审批，本探针未组合
+  `dsh-user-approval`。实测得到的是文档所述降级——`ask` 变成拒绝（`Error: probe-ask`）。
+  → 因此 §13 的“开启审批却没有宿主能力必须启动失败”从设计条款变成可测要求：Jey 必须
+  在装载时探测宿主是否真的提供审批通道，并把 `approvalChannel` 据实传给 `evaluatePolicy`，
+  不能凭配置假定。
+- **`ctx.tools.restrict()` 未演练**，不记任何结论（第 8.2 节 presentation-only gate 仍未开始）。
+- 真实 `@deepseek-ai/dsh` 发行版的 `cordis.yml` overlay 加载未做（M2 的 host-integration gate 内容）。
+
+## 11. 本文件需更正的三处
+
+1. **Cordis 入口不是 `create()`**。交接包与常见 Cordis 用法都写 `import { create } from '@deepseek-ai/cordis'`，
+   在本固定版本上是 `TS2307/TS2339`；真实入口是 `new Context()`。所有后续宿主代码以此为准。
+2. **版本树是混装的**。`@deepseek-ai/dsh@0.1.7-alpha.1` 对其兄弟包声明 `^0.1.7-alpha.1`，
+   因此直接依赖可钉到 alpha.1，但 9 个未被任何包显式钉住的叶子包
+   （`dsh-brand`、`dsh-sandbox`、`dsh-sandbox-policy`、`dsh-timeout`、`dsh-typert-protocol`、
+   `dsh-user-approval`、`dsh-ptc-runtime`、`dsh-util-crypto`、`dsh-util-values`）
+   解析到了 `0.1.7-alpha.2`。这正是交接包禁止的“源码最新分支与已发布旧包混装”，
+   在 CI 里必须靠 lockfile + `pnpm dedupe`/overrides 固定，不能靠 `^`。
+3. 扩展点签名与本文件第 3 节逐字一致，**无漂移**。
+
+## 12. M0 gate 状态
 
 | gate | 状态 | 说明 |
 |---|---|---|
-| compatibility | **PARTIAL** | 源码合同、版本、依赖解析、Node 下限已实测；真实插件加载探针与 `tools/result` 顺序观测尚未执行（下一步） |
-
-已产出的证据：本文件；`artifacts/environment.json`；`docs/handoff/SHA256SUMS.txt` 校验 19/25 通过。
-未产出（阻塞）：`docs/handoff/tests/*` 与三个 `templates/*` 在交接包中缺失 → 见 `artifacts/handoff_gaps.json`。交接包自测的“53 tests PASS”因此在本工作区**不可复核**，不继承其结论。
+| compatibility | **PASS（本地运行时部分）** | 顺序、工具投影、deny、guard、结果冻结均已在真实 loop/ToolRuntime 上执行并通过；`artifacts/compatibility.json` 可重放 |
+| compatibility · 发行版 overlay 加载 | **NOT_RUN** | 需以 `@deepseek-ai/dsh` 发行入口 + `cordis.yml` 绝对路径装载，属 M2 |
+| compatibility · `ask` 授予通道 | **BLOCKED** | 未组合审批服务；降级行为已实测并记录 |
+| compatibility · `restrict()` 时序 | **NOT_RUN** | 与 §8.2 gate 绑定，未开始 |

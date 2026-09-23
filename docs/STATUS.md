@@ -6,8 +6,12 @@
 
 | gate | 状态 | 证据 |
 |---|---|---|
-| compatibility | **PARTIAL** | `docs/HOST_CONTRACT.md`（逐条引用固定提交内文件行号）；`artifacts/environment.json`；`npm install --dry-run @deepseek-ai/dsh@0.1.7-alpha.1` 解析 512 包成功 |
-| 真实插件加载探针 | **NOT_RUN** | 下一步：装 `@deepseek-ai/dsh@0.1.7-alpha.1`，用 `cordis.yml` overlay 加载并观察 `system-prompt/assemble → agent/pre-step → tools/pre-execute → tools/result` 顺序 |
+| compatibility | **PASS（本地运行时）** | `artifacts/compatibility.json`：真实 Cordis 上下文 + 真实 `ToolRuntime` + 生产 `AgentLoop`，只有 LLM 是脚本驱动器；7 个宿主测试全过，事件序列可用 `JEY_TRACE_FILE=<path> pnpm --filter jey-adapter-dsh test` 重放并逐字节比对 |
+| 实测顺序 | 已执行 | `assemble → pre-step → llm-request → pre-execute → pre-execute-decision → guard → execute → post-execute → result → assemble → …`，R-01 在运行时成立 |
+| 已证实的保护性质 | 已执行 | `pre-execute` deny 后工具体不跑；同步 guard 拒绝压过内层 waterfall 的 allow；`tools/result` 的 exec/result/content 三层全冻结、写入抛 `TypeError`；工具集只经 `PromptAssembly.tools` 投影到请求头 |
+| `ask` 授予通道 | **BLOCKED** | 探针未组合 `dsh-user-approval`；实测到文档所述降级（`ask` → 拒绝）。转为可测要求：装载时必须探测宿主审批能力，不能凭配置假定 |
+| `restrict()` 时序 | **NOT_RUN** | 与 §8.2 presentation-only gate 绑定 |
+| 发行版 overlay 加载 | **NOT_RUN** | 用 `@deepseek-ai/dsh` + `cordis.yml` 绝对路径装载，属 M2 host-integration gate |
 
 已核实的事实（不是声明，是查过的）：
 
@@ -23,10 +27,11 @@
 命令与结果（Windows / Node v24.15.0 / pnpm 9.15.9）：
 
 ```sh
-pnpm install                 # 5 包，成功
+pnpm install                 # 成功，含真实 DSH 包
 pnpm -r typecheck            # 0 error（strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes）
 pnpm --filter jey-core test          # 73 tests, 73 pass, 0 fail
 pnpm --filter jey-core test:property # 16 properties, 16 pass, 0 fail
+pnpm --filter jey-adapter-dsh test   # 7 宿主测试, 7 pass, 0 fail（真实 agent loop，离线无密钥）
 ```
 
 | gate | 状态 | 覆盖 |
