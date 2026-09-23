@@ -1,0 +1,36 @@
+{
+  "name": "jey-adapter-dsh",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Jey DSH host adapter: the only package allowed to import DSH/Cordis. Host contract probes live here.",
+  "type": "module",
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test \"test/host/*.test.ts\"",
+    "test:property": "echo \"no property tests in this package yet\" && exit 0"
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis": "4.0.3",
+    "@deepseek-ai/dsh-agent": "0.1.7-alpha.1",
+    "@deepseek-ai/dsh-agent-loop": "0.1.7-alpha.1",
+    "@deepseek-ai/dsh-agent-loop-testkit": "0.1.7-alpha.1",
+    "@deepseek-ai/dsh-invariants": "0.1.7-alpha.1",
+    "@deepseek-ai/dsh-llm": "0.1.7-alpha.1",
+    "@deepseek-ai/dsh-scope": "0.1.7-alpha.1",
+    "@deepseek-ai/dsh-session": "0.1.7-alpha.1",
+    "@deepseek-ai/dsh-session-persistence": "0.1.7-alpha.1",
+    "@deepseek-ai/dsh-session-projection": "0.1.7-alpha.1",
+    "@deepseek-ai/dsh-system-prompt": "0.1.7-alpha.1",
+    "@deepseek-ai/dsh-tools": "0.1.7-alpha.1",
+    "jey-contracts": "workspace:*",
+    "jey-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.1",
+    "typescript": "5.9.3"
+  }
+}

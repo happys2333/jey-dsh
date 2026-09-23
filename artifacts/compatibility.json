@@ -1,0 +1,268 @@
+{
+  "schemaVersion": "1",
+  "purpose": "Executed M0 host-compatibility evidence for jey-adapter-dsh: a real Cordis context running the published DSH agent loop, observed through Jey-shaped plugins.",
+  "isExecutionResult": true,
+  "checkedOn": "2026-09-23",
+  "gitBranch": "feat/jey-m0-m1",
+  "commands": [
+    {
+      "cwd": "D:/codeWork/jev-dsh/repo",
+      "command": "pnpm --filter jey-adapter-dsh typecheck",
+      "exitCode": 0,
+      "note": "tsc -p tsconfig.json --noEmit over src/**/*.ts and test/**/*.ts, no suppressions"
+    },
+    {
+      "cwd": "D:/codeWork/jev-dsh/repo",
+      "command": "pnpm --filter jey-adapter-dsh test",
+      "exitCode": 0,
+      "note": "node --test \"test/host/*.test.ts\" -> tests 7, pass 7, fail 0, duration ~0.34s, fully offline"
+    },
+    {
+      "cwd": "D:/codeWork/jev-dsh/repo/packages/adapter-dsh",
+      "command": "node node_modules/typescript/bin/tsc -p tmp-negative/tsconfig.json",
+      "exitCode": 2,
+      "note": "deliberate negative typecheck probe (scratch file, since deleted); it exited 2 with the diagnostics recorded under typeContractFindings"
+    }
+  ],
+  "runtime": {
+    "node": "v24.15.0",
+    "pnpm": "9.15.9",
+    "typescript": "5.9.3",
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "networkUsed": false,
+    "apiKeysUsed": false
+  },
+  "host": {
+    "product": "DSH (deepseek-harness)",
+    "pinnedCommit": "c36a83ff6bb95e3f82cf79f9be7c724270a8aa61",
+    "localReadOnlyReference": "D:/codeWork/jev-dsh/.work/vendor/dsh",
+    "testkit": "@deepseek-ai/dsh-agent-loop-testkit, which mounts LlmRuntime, SessionStore, SessionProjectionRegistry, SystemPrompt, ToolRuntime, AgentRegistry and deliberately no LLM adapter"
+  },
+  "resolvedVersions": {
+    "note": "read from repo/node_modules/.pnpm after install; the 12 @deepseek-ai/* packages declared by packages/adapter-dsh are all 0.1.7-alpha.1, cordis is 4.0.3, but 9 transitively pulled leaf packages resolved to 0.1.7-alpha.2",
+    "direct": {
+      "@deepseek-ai/cordis": "4.0.3",
+      "@deepseek-ai/dsh-agent": "0.1.7-alpha.1",
+      "@deepseek-ai/dsh-agent-loop": "0.1.7-alpha.1",
+      "@deepseek-ai/dsh-agent-loop-testkit": "0.1.7-alpha.1",
+      "@deepseek-ai/dsh-invariants": "0.1.7-alpha.1",
+      "@deepseek-ai/dsh-llm": "0.1.7-alpha.1",
+      "@deepseek-ai/dsh-scope": "0.1.7-alpha.1",
+      "@deepseek-ai/dsh-session": "0.1.7-alpha.1",
+      "@deepseek-ai/dsh-session-persistence": "0.1.7-alpha.1",
+      "@deepseek-ai/dsh-session-projection": "0.1.7-alpha.1",
+      "@deepseek-ai/dsh-system-prompt": "0.1.7-alpha.1",
+      "@deepseek-ai/dsh-tools": "0.1.7-alpha.1"
+    },
+    "transitive": {
+      "@deepseek-ai/cosmokit": "1.8.5",
+      "@deepseek-ai/schemastery": "3.18.4",
+      "@deepseek-ai/dsh-brand": "0.1.7-alpha.2",
+      "@deepseek-ai/dsh-ptc-runtime": "0.1.7-alpha.2",
+      "@deepseek-ai/dsh-sandbox": "0.1.7-alpha.2",
+      "@deepseek-ai/dsh-sandbox-policy": "0.1.7-alpha.2",
+      "@deepseek-ai/dsh-timeout": "0.1.7-alpha.2",
+      "@deepseek-ai/dsh-typert-protocol": "0.1.7-alpha.2",
+      "@deepseek-ai/dsh-user-approval": "0.1.7-alpha.2",
+      "@deepseek-ai/dsh-util-crypto": "0.1.7-alpha.2",
+      "@deepseek-ai/dsh-util-values": "0.1.7-alpha.2"
+    },
+    "versionSkew": {
+      "unpinnedLeafCount": 9,
+      "detail": "dsh-brand, dsh-ptc-runtime, dsh-sandbox, dsh-sandbox-policy, dsh-timeout, dsh-typert-protocol, dsh-user-approval, dsh-util-crypto, dsh-util-values resolved to 0.1.7-alpha.2 while the pinned core stayed 0.1.7-alpha.1",
+      "consequence": "the probe ran against a mixed tree, not a pure 0.1.7-alpha.1 closure. It passed, so no observed behaviour depended on the skew, but this artifact does not certify 0.1.7-alpha.1 in isolation and any Jey lockfile claim must name the resolved set above."
+    }
+  },
+  "observedEventSequence": [
+    "assemble",
+    "pre-step",
+    "llm-request",
+    "pre-execute",
+    "pre-execute-decision",
+    "guard",
+    "execute",
+    "post-execute",
+    "result",
+    "assemble",
+    "pre-step",
+    "llm-request"
+  ],
+  "observedTrace": [
+    { "stage": "assemble", "advertised": ["jey_probe_note"], "returned": ["jey_probe_note"] },
+    { "stage": "pre-step", "turn": 1, "step": 1, "outcome": "enter", "messagesReplaced": false },
+    { "stage": "llm-request", "tools": ["jey_probe_note"] },
+    { "stage": "pre-execute", "tool": "jey_probe_note", "argumentsFrozen": true, "argumentsJson": "{\"note\":\"probe-note-1\"}" },
+    { "stage": "pre-execute-decision", "tool": "jey_probe_note", "decision": "allow" },
+    { "stage": "guard", "tool": "jey_probe_note" },
+    { "stage": "execute", "tool": "jey_probe_note" },
+    { "stage": "post-execute", "tool": "jey_probe_note", "isError": false },
+    { "stage": "result", "tool": "jey_probe_note", "execFrozen": true, "resultFrozen": true, "contentFrozen": true, "isError": false },
+    { "stage": "assemble", "advertised": ["jey_probe_note"], "returned": ["jey_probe_note"] },
+    { "stage": "pre-step", "turn": 1, "step": 2, "outcome": "enter", "messagesReplaced": false },
+    { "stage": "llm-request", "tools": ["jey_probe_note"] }
+  ],
+  "observedSequenceNotes": [
+    "one turn, two steps: step 1 is the scripted tool call, step 2 is the scripted text answer",
+    "the probe listener records 'pre-execute' on waterfall entry and 'pre-execute-decision' once the inner chain settles, so entry-time order is not polluted by the await",
+    "the monotonic guard stage fires after the whole tools/pre-execute waterfall has settled and before tools/execute, exactly as the source comment claims"
+  ],
+  "assertions": [
+    {
+      "id": "A-01",
+      "test": "observes assemble -> pre-step -> pre-execute -> execute -> result on the real runtime",
+      "checks": [
+        "indexOf(assemble) < indexOf(pre-step) < indexOf(llm-request) < indexOf(pre-execute) < indexOf(execute) < indexOf(result)",
+        "the probe tool body ran exactly once with note 'probe-note-1'",
+        "the session log contains a turn/end event"
+      ]
+    },
+    {
+      "id": "A-02",
+      "test": "advertises exactly the assembled tool set to the model",
+      "checks": [
+        "two assemblies and two model requests",
+        "every assembly's advertised set equals its returned set equals ['jey_probe_note']",
+        "each request's GenerateOptions.tools equals that assembly's returned set by name"
+      ]
+    },
+    {
+      "id": "A-03",
+      "test": "stops the tool body when a tools/pre-execute listener denies the call",
+      "checks": [
+        "probe tool body call list is empty",
+        "the chain decision observed by the probe is 'deny'",
+        "no 'execute' stage was observed",
+        "the single durable tool/result text is exactly 'Error: probe-policy-denied'"
+      ]
+    },
+    {
+      "id": "A-04",
+      "test": "lets a monotonic guard denial outrank a waterfall allow",
+      "checks": [
+        "a later-registered waterfall listener returned {kind:'allow'} and the probe observed decision 'allow'",
+        "indexOf(guard) > indexOf(pre-execute)",
+        "probe tool body call list is empty and no 'execute' stage was observed",
+        "the durable tool/result text matches 'Error: jey-probe-guard-denied'"
+      ]
+    },
+    {
+      "id": "A-05",
+      "test": "gives tools/result observers a frozen outcome and no return channel",
+      "checks": [
+        "Object.isFrozen(exec), Object.isFrozen(result) and Object.isFrozen(result.content) are all true",
+        "both mutation attempts from a second tools/result observer threw TypeError ('result:TypeError', 'result.content:TypeError')",
+        "the model-visible durable result is still 'probe-note-1', unchanged by the observer"
+      ]
+    },
+    {
+      "id": "A-06",
+      "test": "degrades an ask decision to a denial because no approval service is composed",
+      "checks": [
+        "a listener returning {kind:'ask', reason:'probe-ask'} was observed as decision 'ask'",
+        "the tool body never ran and no 'execute' stage was observed",
+        "the durable tool/result text is exactly 'Error: probe-ask', i.e. the ask degraded to a denial carrying its own reason"
+      ]
+    },
+    {
+      "id": "A-07",
+      "test": "reports frozen parsed arguments to pre-execute listeners",
+      "checks": [
+        "exactly one pre-execute observation for 'jey_probe_note'",
+        "Object.isFrozen(exec.arguments) is true",
+        "the frozen arguments round-trip to {\"note\":\"probe-note-1\"}"
+      ]
+    }
+  ],
+  "claims": [
+    {
+      "id": "R-01",
+      "claim": "system-prompt/assemble runs before agent/pre-step, so a restriction made inside pre-step cannot affect the request already assembled for that step",
+      "result": "PASS",
+      "reason": "assertion A-01 observed assemble at trace index 0 and pre-step at index 1 on the real loop for both steps; the ordering is host behaviour, not a source reading"
+    },
+    {
+      "id": "R-01b",
+      "claim": "the model-visible tool set exists only in PromptAssembly.tools and reaches the adapter from there",
+      "result": "PASS",
+      "reason": "A-02: every assembly's returned tool-name set equalled the tools array of the immediately following real model request; LlmCallConfig carries no tools field"
+    },
+    {
+      "id": "R-02",
+      "claim": "a tools/pre-execute waterfall listener returning {kind:'deny'} prevents the tool body from running",
+      "result": "PASS",
+      "reason": "A-03: body call list empty, no tools/execute stage, and the denial reason is what the model read back"
+    },
+    {
+      "id": "R-03",
+      "claim": "a synchronous ctx.tools.guard() denial cannot be overridden by a waterfall listener that allows",
+      "result": "PASS",
+      "reason": "A-04: the waterfall decision observed by the probe was 'allow', yet the guard ran afterwards, the body never executed, and the call surfaced as an error carrying the guard reason"
+    },
+    {
+      "id": "R-04",
+      "claim": "tools/result is an emit: the outcome is deep-frozen and observers have no return channel",
+      "result": "PASS",
+      "reason": "A-05 froze nothing by policy — the host had already frozen exec, result and result.content; mutation threw TypeError and the model-visible content was unaffected. Independently, the published signature returns undefined and the negative typecheck probe reports TS2322 for an observer returning a value"
+    },
+    {
+      "id": "R-05",
+      "claim": "parsed tool arguments cross the pipeline frozen and lossless",
+      "result": "PASS",
+      "reason": "A-07: Object.isFrozen(exec.arguments) true at tools/pre-execute, JSON round-trip equal to the scripted call"
+    },
+    {
+      "id": "R-06",
+      "claim": "an ask decision can be granted through this harness",
+      "result": "BLOCKED",
+      "reason": "the registry resolves ask through ctx.get('approval'); with no ApprovalService composed it degrades to denial (proven by A-06). Granting needs @deepseek-ai/dsh-user-approval, which is not a declared dependency of packages/adapter-dsh and whose service also insists on an open turn for its approval/asked + approval/decided audit pair. No approval-granted PASS is claimed"
+    },
+    {
+      "id": "R-07",
+      "claim": "ctx.tools.restrict() is a scope filter that requires agent.ctx and throws on a global ctx",
+      "result": "BLOCKED",
+      "reason": "not exercised in this probe run: the probe plugins register global listeners and the guard marker only; no assertion was executed, so no PASS is recorded here"
+    },
+    {
+      "id": "R-08",
+      "claim": "a Jey-shaped plugin (name/inject/apply) loads into a real DSH context and sees the extension points it declares",
+      "result": "PASS",
+      "reason": "probe-plugin (inject: ['tools']) and scripted-llm (inject: ['llm']) were loaded with ctx.plugin() and every declared listener fired, including cross-service ones (system-prompt/assemble and agent/pre-step fired from a fiber that injects only tools)"
+    },
+    {
+      "id": "R-09",
+      "claim": "the pinned 0.1.7-alpha.1 core installs and runs on this machine offline",
+      "result": "PASS",
+      "reason": "typecheck clean and 7/7 tests green on Node v24.15.0 with no network and no API keys; see versionSkew for the alpha.2 leaf caveat"
+    }
+  ],
+  "typeContractFindings": [
+    {
+      "id": "T-01",
+      "finding": "the design brief's `import { create } from '@deepseek-ai/cordis'` does not exist; tsc reports TS2339 \"Property 'create' does not exist on type 'typeof import(...cordis/lib/types/index)'\". The real entry point is the exported class: new Context()",
+      "impact": "adapter construction and any ADR text must say new Context(); no factory import"
+    },
+    {
+      "id": "T-02",
+      "finding": "ctx.on() is typed per event: a listener whose return disagrees with Events[name] fails with TS2322 even when written inline (probes: {kind:'nope'} at tools/pre-execute, a number-returning tools/result listener). The untyped fallback overload on EventsService did not swallow either case",
+      "impact": "listener signature drift is a build failure in this package, so Jey policies can rely on the compile-time contract"
+    },
+    {
+      "id": "T-03",
+      "finding": "tools/result is declared to return undefined, so 'the return value is ignored' is enforced by the type, not merely by the dispatcher; the immutability half of the claim is enforced by a deep freeze the host applies before observers run",
+      "impact": "a Jey presentation layer cannot reshape a result from tools/result; it must act in tools/post-execute"
+    },
+    {
+      "id": "T-04",
+      "finding": "no type mismatch was found between the recorded HOST_CONTRACT signatures and the installed 0.1.7-alpha.1 .d.ts files for the events this probe uses; the ctx.on listener types resolved through Scoped<...> accepted plain arrow functions",
+      "impact": "docs/HOST_CONTRACT.md section 3 stays authoritative for these five extension points"
+    }
+  ],
+  "limitations": [
+    "one scripted provider route ('jey-probe') and one registered tool; provider selection, retry, and PTC presentation are untested",
+    "the probe observes ordering and decisions from global listeners; agent-scoped (Scoped<Agent>) dispatch filtering and ctx.tools.restrict() are not exercised",
+    "ask approval grant path unreachable offline without dsh-user-approval; only its documented degrade-to-deny is proven",
+    "evidence was produced against a mixed 0.1.7-alpha.1 / alpha.2 tree (see versionSkew)"
+  ]
+}
