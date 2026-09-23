@@ -11,8 +11,8 @@ Jey 是一个嵌进现有 Agent 的**可替换模型的结构化决策层**。�
 ```sh
 pnpm install
 pnpm -r build && pnpm -r typecheck   # 类型合同
-pnpm --filter jey-core test          # 35 条单元
-pnpm --filter jey-core test:property # 9 条属性
+pnpm --filter jey-core test          # 67 条单元
+pnpm --filter jey-core test:property # 16 条属性
 ```
 
 真实状态逐条记在 `docs/STATUS.md`，未运行的项一律写 `NOT_RUN`/`BLOCKED`，不用工程测试通过冒充模型质量合格。
