@@ -22,6 +22,37 @@
 - `LlmCallConfig` 不含 `tools`；模型可见工具集只存在于 `PromptAssembly.tools`。
 - TypeSafe/Jev 端点真实存在；SemIf 无 HTTP 服务；`buberlo/dsh-jev` 为 MIT。
 
+## M2 DSH 插件闭环
+
+```sh
+pnpm -r build            # 0 error
+pnpm -r typecheck        # 0 error
+pnpm --filter jey-adapter-dsh test   # 13 宿主测试（7 探针 + 6 闭环），13 pass，0 fail
+```
+
+真实 Cordis 上下文 + 真实 `ToolRuntime` + 生产 `AgentLoop`，只有 LLM 是脚本驱动器、
+决策提供方是 synthetic mock。全程离线、无密钥。
+
+| gate | 状态 | 证据 |
+|---|---|---|
+| host-integration | **PASS（闭环部分）** | 6 条闭环测试：shadow 下工具体照常执行且 provider 被问一次；`off` 下 provider 调用数为 0 且不产记录；`enforce`+mock 在装载时就被 `ConfigError` 拒绝；已暂停路径仅凭确定性规则拒绝、**不产生 provider 调用**；`close()` 之后不留监听器；审计三段字段分立 |
+| lifecycle | **PASS（部分）** | 装载/卸载、generation 递增、事件顺序、审计行可被 `scanJournal` 原样回读且无隔离行 |
+
+未覆盖（不记为通过）：
+
+- `apply()` 这个 cordis 入口本身没跑过：测试走 `mountJey(ctx, config, deps)`，因为
+  provider 和 audit sink 无法从 `cordis.yml` 配置块注入。入口的端到端验证要等 M7 的
+  tarball 全新安装测试。
+- `fileLineSink`（追加与按大小轮转）尚无测试。
+- egress 拒绝路径只在 core 单测里覆盖；宿主级需要 local/typesafe 真实提供方（M3）。
+- `ask` 的授予仍 BLOCKED：本宿主拓扑里没有 `dsh-user-approval`。
+
+**设计裁决（写清楚，因为它和"shadow 什么都不改"表面矛盾）**：确定性硬规则在 shadow
+下也照常拒绝。理由是 shadow 的含义是"模型的意见只作观察"，而"这条路径已经连续失败
+3 次"是已发生事实的记录，不是意见；同步 `guard()` 本来也在拒绝它，若 waterfall 在
+shadow 下放过同一件事，两层就会互相矛盾。核心里 `evaluatePolicy` 的 shadow 不变量
+仍然成立——它保护的是模型派生动作。
+
 ## M1 核心
 
 命令与结果（Windows / Node v24.15.0 / pnpm 9.15.9）：
