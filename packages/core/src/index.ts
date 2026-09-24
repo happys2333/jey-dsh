@@ -85,3 +85,26 @@ export {
   type GuardedApplication,
   type Phase,
 } from './coordinator.ts'
+
+export {
+  AuditJournal,
+  AuditSchemaError,
+  findDuplicateIds,
+  mintAuditId,
+  parseAuditLine,
+  publicSnapshot,
+  recordDecision,
+  referenceDigest,
+  scanJournal,
+  serializeAuditEvent,
+  shouldBlockDispatch,
+  type Auditable,
+  type AuditDiagnostic,
+  type AuditEvent,
+  type DecisionRecord,
+  type EmitResult,
+  type JournalCounters,
+  type JournalOptions,
+  type LineSink,
+  type ScanResult,
+} from './audit.ts'
