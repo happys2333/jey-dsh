@@ -6,12 +6,12 @@ Jey 是一个嵌进现有 Agent 的**可替换模型的结构化决策层**。�
 
 ## 现在能用什么
 
-**还不能安装。** 当前进度在 M0/M1：宿主合同已在真实 DSH 运行时上探针核实；决策核心（纯策略、外发策略、边界校验、快照、裁剪、无进展、协调器、配置）已实现并通过测试。
+**还不能安装。** 当前进度在 M0/M1：宿主合同已在真实 DSH 运行时上探针核实；决策核心（纯策略、外发策略、边界校验、快照、裁剪、无进展、协调器、配置、审计）已实现并通过测试。
 
 ```sh
 pnpm install
 pnpm -r build && pnpm -r typecheck   # 类型合同
-pnpm --filter jey-core test          # 107 条单元
+pnpm --filter jey-core test          # 122 条单元
 pnpm --filter jey-core test:property # 16 条属性
 ```
 
