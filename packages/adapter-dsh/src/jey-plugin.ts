@@ -100,6 +100,17 @@ const stderrSink: LineSink = {
   },
 }
 
+/**
+ * Where diagnostics go when nothing was injected. An explicit path wins over stderr
+ * because a plugin that writes to a hostile terminal's stderr is not really auditing
+ * anything. The path comes from the environment, never from a model-visible setting.
+ */
+function defaultSink(config: JeyConfig): LineSink {
+  const path = process.env.JEY_AUDIT_PATH
+  if (path === undefined || path === '') return stderrSink
+  return fileLineSink({ path, maxFileBytes: config.audit.maxFileBytes })
+}
+
 export interface JeyMountDeps {
   readonly provider: DecisionProvider
   readonly audit?: LineSink
@@ -139,7 +150,7 @@ export function mountJey(ctx: Context, raw: unknown, deps: JeyMountDeps): JeyRun
   const config = loadConfig(raw, capabilities())
   const generation = ++generationCounter
   const policyVersion = `sha256:${sha256(JSON.stringify({ config, generation }))}`
-  const journal = new AuditJournal(deps.audit ?? stderrSink, {
+  const journal = new AuditJournal(deps.audit ?? defaultSink(config), {
     maxRetainedEvents: config.audit.retainedEvents,
     maxLineBytes: config.audit.maxFileBytes,
     now,

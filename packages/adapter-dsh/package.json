@@ -10,7 +10,7 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "tsc -p tsconfig.json",
-    "test": "node --test \"test/host/*.test.ts\"",
+    "test": "node --test \"test/host/*.test.ts\" \"test/unit/*.test.ts\"",
     "test:property": "echo \"no property tests in this package yet\" && exit 0"
   },
   "dependencies": {
