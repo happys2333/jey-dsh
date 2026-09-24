@@ -56,3 +56,32 @@ export {
   UnsupportedCapability,
   type AssessmentFacts,
 } from './questions.ts'
+
+export {
+  ConfigError,
+  SCHEMA_PATH,
+  loadConfig,
+  reloadDecision,
+  schemaDefaults,
+  type ConfigIssue,
+  type ConfigResult,
+  type HostCapabilities,
+  type JeyConfig,
+  type ModelIdentity,
+  type ProviderKindConfig,
+} from './config.ts'
+
+export {
+  DecisionCoordinator,
+  IllegalTransition,
+  Run,
+  canTransition,
+  isClosed,
+  CLOSED_PHASES,
+  type ApplicationResult,
+  type CoordinatorLimits,
+  type CoordinatorOptions,
+  type CoordinatorOutcome,
+  type GuardedApplication,
+  type Phase,
+} from './coordinator.ts'

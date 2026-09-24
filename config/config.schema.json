@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/happys2333/jey-dsh/config.schema.json",
+  "title": "Jey for DSH plugin configuration v1",
+  "description": "Structure only. Contradictory-but-well-formed combinations are rejected in code by packages/core/src/config.ts, not here. Never put credentials or model paths that a model could influence in this file.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "mode", "provider", "egress", "limits", "features", "audit"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1",
+      "description": "Jey's own wire/config version. Not the DSH package version, not the Jev model id, not the SemIf commit."
+    },
+    "mode": { "enum": ["off", "shadow", "enforce"] },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["unconfigured", "mock", "local", "typesafe"] },
+        "local": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["endpoint", "tokenRef", "ownership", "expectedModel"],
+          "properties": {
+            "endpoint": { "type": "string", "pattern": "^http://(127\\.(?:[0-9]{1,3}\\.){2}[0-9]{1,3}|\\[::1\\])(?::[0-9]{1,5})?(?:/\\S*)?$", "description": "Literal loopback only: 127.x.x.x or [::1], with an optional path. A bare `127.` prefix is not enough (127.evil.com matches it) and a resolvable `localhost` hostname is not accepted, because DNS can point it somewhere else while the string still looks innocent." },
+            "tokenRef": { "type": "string", "minLength": 1, "pattern": "^(env|file|keystore):", "description": "A reference, never the token itself." },
+            "ownership": { "enum": ["external", "managed"], "default": "external" },
+            "expectedModel": { "$ref": "#/$defs/modelIdentity" }
+          }
+        },
+        "typesafe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["credentialRef", "model", "endpointOrigin"],
+          "properties": {
+            "credentialRef": { "type": "string", "minLength": 1, "pattern": "^(env|file|keystore):" },
+            "model": { "type": "string", "minLength": 1, "description": "Explicit version. An alias is allowed only if the resolved model is recorded on every observation." },
+            "endpointOrigin": { "type": "string", "pattern": "^https://[^/?]+$" }
+          }
+        }
+      },
+      "allOf": [
+        { "if": { "properties": { "kind": { "const": "local" } }, "required": ["kind"] }, "then": { "required": ["local"] } },
+        { "if": { "properties": { "kind": { "const": "typesafe" } }, "required": ["kind"] }, "then": { "required": ["typesafe"] } },
+        { "if": { "properties": { "kind": { "enum": ["unconfigured", "mock"] } }, "required": ["kind"] }, "then": { "not": { "anyOf": [{ "required": ["local"] }, { "required": ["typesafe"] }] } } }
+      ]
+    },
+    "egress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": { "enum": ["deny", "local-only", "allowlist"] },
+        "allowedPurposes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["tool-assessment", "tool-relevance", "evidence-check", "explicit-query"] },
+          "description": "Empty means nothing is allowed. There is no wildcard purpose."
+        },
+        "allowedOrigins": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^https?://[^/*?]+$" },
+          "description": "Exact origins. '*' is rejected by the pattern, and request content can never add to this list."
+        }
+      }
+    },
+    "calibration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "appliesTo": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["model", "templateDigest", "task"],
+          "properties": {
+            "model": { "$ref": "#/$defs/modelIdentity" },
+            "templateDigest": { "type": "string", "pattern": "^sha256:" },
+            "task": { "enum": ["tool-assessment", "tool-relevance"] }
+          }
+        },
+        "conflictDenyAtOrAbove": { "type": "number", "minimum": 0, "maximum": 1 },
+        "conflictAskAtOrAbove": { "type": "number", "minimum": 0, "maximum": 1 },
+        "goalBelow": { "type": "number", "minimum": 0, "maximum": 1 },
+        "evidenceBelow": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "description": "Absent means uncalibrated, which disables probability-driven denial. A partial calibration block is rejected in code: an id without an applicability declaration is exactly the shape that would silently invalidate an old threshold against a new model."
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deadlineMs", "maxConcurrent", "maxQueue", "maxStateBytes", "maxQuestions"],
+      "properties": {
+        "deadlineMs": { "type": "integer", "minimum": 1, "maximum": 60000, "default": 1500, "description": "Includes queue time. A queue wait that consumes the deadline must fail before the provider is reached." },
+        "maxConcurrent": { "type": "integer", "minimum": 1, "maximum": 32, "default": 2 },
+        "maxQueue": { "type": "integer", "minimum": 0, "maximum": 256, "default": 16 },
+        "maxStateBytes": { "type": "integer", "minimum": 256, "maximum": 1048576, "default": 32768 },
+        "maxQuestions": { "type": "integer", "minimum": 1, "maximum": 64, "default": 8 },
+        "perTurnCalls": { "type": "integer", "minimum": 0, "maximum": 64, "default": 8 },
+        "perSessionCalls": { "type": "integer", "minimum": 0, "maximum": 512, "default": 64 },
+        "maxIdenticalFailures": { "type": "integer", "minimum": 1, "maximum": 10, "default": 3 },
+        "pollBudget": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 }
+      }
+    },
+    "features": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "toolAssessment": { "type": "boolean", "default": false },
+        "toolRelevance": { "type": "boolean", "default": false },
+        "presentationFilter": { "type": "boolean", "default": false, "description": "Requires the system-prompt/assemble timing gate to pass on the pinned host; the host probe currently records it NOT_RUN." },
+        "approvalRequests": { "type": "boolean", "default": false, "description": "Must be backed by a host approval channel that was actually detected, not assumed." },
+        "modelRouting": { "const": false, "default": false, "description": "v1 does not implement automatic model switching, so it must not be accepted as enabled." }
+      }
+    },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rawContent": { "const": false, "default": false, "description": "Raw arguments and full context are never stored by default." },
+        "onFailure": { "enum": ["keep-execution", "fail-closed-before-dispatch"], "default": "keep-execution" },
+        "retainedEvents": { "type": "integer", "minimum": 1, "maximum": 100000, "default": 2000 },
+        "maxFileBytes": { "type": "integer", "minimum": 1024, "maximum": 67108864, "default": 5242880 }
+      }
+    }
+  },
+  "$defs": {
+    "modelIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requested", "revision"],
+      "properties": {
+        "requested": { "type": "string", "minLength": 1 },
+        "revision": { "type": "string", "minLength": 1, "description": "Pinned revision, not a branch name." },
+        "weightsDigest": { "type": "string", "pattern": "^sha256:" },
+        "tokenizerRevision": { "type": "string", "minLength": 1 },
+        "quantization": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
