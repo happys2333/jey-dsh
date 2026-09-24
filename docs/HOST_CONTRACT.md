@@ -152,7 +152,7 @@ assemble → pre-step → llm-request → pre-execute → pre-execute-decision
 - **`ctx.tools.restrict()` 未演练**，不记任何结论（第 8.2 节 presentation-only gate 仍未开始）。
 - 真实 `@deepseek-ai/dsh` 发行版的 `cordis.yml` overlay 加载未做（M2 的 host-integration gate 内容）。
 
-## 11. 本文件需更正的三处
+## 11. 本文件需更正的四处
 
 1. **Cordis 入口不是 `create()`**。交接包与常见 Cordis 用法都写 `import { create } from '@deepseek-ai/cordis'`，
    在本固定版本上是 `TS2307/TS2339`；真实入口是 `new Context()`。所有后续宿主代码以此为准。
@@ -163,6 +163,7 @@ assemble → pre-step → llm-request → pre-execute → pre-execute-decision
    解析到了 `0.1.7-alpha.2`。这正是交接包禁止的“源码最新分支与已发布旧包混装”，
    在 CI 里必须靠 lockfile + `pnpm dedupe`/overrides 固定，不能靠 `^`。
 3. 扩展点签名与本文件第 3 节逐字一致，**无漂移**。
+4. **effect 内抛错会连带拒绝 `ctx.plugin()`。** 实测：`apply` 里注册的 effect 抛 `ConfigError` 时，`await ctx.plugin(plugin, config)` 一起被 reject，插件不会半装上去。这意味着"配置被拒但装载成功、功能静默失效"这条最坏路径在宿主层面就走不通，我们的 `enforce+mock` 拒绝因此是真拒绝而不是运行期降级。
 
 ## 12. M0 gate 状态
 
