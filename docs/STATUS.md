@@ -27,20 +27,21 @@
 命令与结果（Windows / Node v24.15.0 / pnpm 9.15.9）：
 
 ```sh
-pnpm install                 # 成功，含真实 DSH 包
-pnpm -r typecheck            # 0 error（strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes）
-pnpm --filter jey-core test          # 73 tests, 73 pass, 0 fail
-pnpm --filter jey-core test:property # 16 properties, 16 pass, 0 fail
-pnpm --filter jey-adapter-dsh test   # 7 宿主测试, 7 pass, 0 fail（真实 agent loop，离线无密钥）
+pnpm install                          # 成功，含真实 DSH 包
+pnpm -r typecheck                     # 0 error（strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes）
+pnpm --filter jey-core test           # 107 tests, 107 pass, 0 fail
+pnpm --filter jey-core test:property  # 16 properties, 16 pass, 0 fail
+pnpm --filter jey-adapter-dsh test    # 7 宿主测试, 7 pass, 0 fail（真实 agent loop，离线无密钥）
 ```
 
 | gate | 状态 | 覆盖 |
 |---|---|---|
-| typecheck | **PASS** | contracts + core，无 `any` 兜底，无 `@ts-ignore` |
-| unit | **PASS** | 策略表 1 全 16 格、absorbing 行、硬规则、取消优先、必需题缺失、未校准不得 deny、陈旧快照、off/shadow 惰性；外发 deny 默认、local-only 精确 origin、allowlist 五条件、调用方不得指定传输参数；边界校验的路径收集 |
-| property | **PASS** | Jey 永不放宽宿主决定；`allow` 结果只可能来自 `allow`+`abstain`；shadow/off 惰性；无观测时 enforce 不 abstain；放行必经已配置 origin/destination |
-| 已实现模块 | — | `policy.ts`（§7.2 两张表）、`egress.ts`（§5.3）、`validate.ts`（§6.1 边界校验）、`snapshot.ts`（§4.2/§10.1 摘要绑定与新鲜度）、`truncation.ts`（§5.2 字节预算裁剪）、`progress.ts`（§9 无进展检测）、`questions.ts`（§7.1 固定模板与能力预检）、`canonical.ts`（稳定摘要） |
-| 未开始 | **NOT_RUN** | `DecisionCoordinator`（§4.4/§10 状态机与队列）、DSH schema 子集映射、`config.schema.json` |
+| typecheck | **PASS** | contracts + core + adapter-dsh，无 `any` 兜底，无 `@ts-ignore` |
+| unit | **PASS** | 107 条：策略表 1 全 16 格与 absorbing 行、取消优先、必需题缺失、未校准不得 deny、陈旧快照、off/shadow 惰性；外发 deny 默认、精确 origin、allowlist 条件、调用方不得指定传输参数；边界校验路径收集；快照绑定与新鲜度；字节预算裁剪；无进展计数；固定模板与能力预检；生命周期与队列；配置结构与矛盾组合 |
+| property | **PASS** | Jey 永不放宽宿主决定；`allow` 只可能来自 `allow`+`abstain`；shadow/off 惰性；无观测时 enforce 不 abstain；放行必经已配置 origin；裁剪后必为合法 JSON、不超预算、有记录、受保护段不被整段丢弃；暂停路径不会重获失败预算 |
+| M1 完成度 | **PARTIAL** | 见下"未开始"。已交付的模块本身 gate 为 PASS，不等同于 M1 整体完成 |
+| 已实现模块 | — | `policy.ts`（§7.2）、`egress.ts`（§5.3）、`validate.ts`（§6.1）、`snapshot.ts`（§4.2/§10.1）、`truncation.ts`（§5.2）、`progress.ts`（§9）、`questions.ts`（§7.1/§8.1）、`coordinator.ts`（§4.4/§10.1/§10.2 生命周期、队列、deadline、单次应用）、`config.ts` + `config/config.schema.json`（§13、附录 4）、`canonical.ts` |
+| 未开始 | **NOT_RUN** | `AuditWriter`（§11 有界脱敏事件）、按会话公平性与 §10.4 的 turn/session 配额执行（上限已在配置里声明但未落地执行）、DSH 工具 schema 子集映射（属 adapter，M2） |
 
 ## 过程中发现并修掉的真实缺陷
 
@@ -50,6 +51,13 @@ pnpm --filter jey-adapter-dsh test   # 7 宿主测试, 7 pass, 0 fail（真实 a
 4. **暂停后重获失败预算**：同一路径暂停后遇到同一指纹的失败，计数从 1 重新开始，等于允许 Agent 每轮再犯 3 次、无限循环。属性测试给出反例 `[4]` 后修掉：暂停态在同指纹下保持计数不变，指纹变化（实质进展）才解冻。
 5. `buildSnapshot` 只冻结外层对象，`ref` 可被就地改写 → 应用决策时读到的可能是被改过的元组。已连 `ref` 一起冻结。
 6. 传给 `fc.jsonValue` 的 `shapeDepth` 在该版本并非合法约束项，运行时被静默忽略。由 typecheck 抓到并移除。
+7. **回写即失效的开关**：`"const": false` 而没有 `"default"` 时，字段缺省就是 `undefined`，`undefined !== false` 会让"关掉"读成"没关"。`features.modelRouting` 与 `audit.rawContent` 各中一次，现补 default 并加了一条 schema 自审测试。
+8. **我自己写的 loopback 正则是个洞**：`^http://127\.[^/?]+$` 会放过 `http://127.evil.com/`。给这条写回归测试时才发现，已改成必须匹配 `127.x.x.x` 或 `[::1]` 字面量，并留下该反例测试。
+9. **队列饥饿死锁**：入队的请求被同时计入"执行中"名额，`#pump` 的条件 `inflight < maxConcurrent` 永远不成立，排队的 run 再也不会被启动。表现是测试挂到超时。
+10. **超时在非法相位上结算**：deadline 原本在 `await provider` 返回之后才判定，此时 run 已在 `observed`，而 `observed → timed_out` 不在状态表里，于是抛 `IllegalTransition` 成为未处理拒绝，调用方的 promise 永不落地。改为用 race 在 `running` 相位就结算，迟到的答案只做诊断。
+11. Node 的类型剥离不支持 TypeScript 参数属性（`constructor(readonly x: T)`），一个 `Run` 构造函数就让 9 个测试文件全部加载失败。
+
+另记：一次用 shell 打补丁的操作有 3 处替换静默没生效却报告成功，靠 grep 复核才发现；此后同类改动一律用编辑器改并回读确认。
 
 这些都属于“看起来通过、实际不安全”一类，记录在此以便复核。
 
