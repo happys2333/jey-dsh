@@ -1,0 +1,106 @@
+{
+  "loadSeconds": 11.97,
+  "identity": {
+    "kind": "local",
+    "providerVersion": "local_decider/semif-0.3.35",
+    "requestedModel": "bartowski/Qwen_Qwen3.5-4B-GGUF",
+    "resolvedModel": "bartowski/Qwen_Qwen3.5-4B-GGUF@4168f45a16a1290d65a4ec0fa312ae917a4c15d6#Qwen_Qwen3.5-4B-Q4_K_M.gguf",
+    "modelRevision": "4168f45a16a1290d65a4ec0fa312ae917a4c15d6",
+    "weightsDigest": "13c16f426047e2de38cd075bdade4a7bcbc8c774384876f677740cda65f8a983",
+    "tokenizerRevision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+    "templateDigest": "04ebb64be5469bb07dfc5edcc09ccd401b0752b2c0134392d67360278f440800",
+    "quantization": "Q4_K_M",
+    "synthetic": false
+  },
+  "backend": {
+    "source": "D:\\codeWork\\jev-dsh\\repo\\.local\\hf-cache\\hub\\models--Qwen--Qwen3.5-4B\\snapshots\\851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+    "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+    "backend": "llamacpp",
+    "dtype": "gguf-quantized",
+    "gguf": {
+      "file": "Qwen_Qwen3.5-4B-Q4_K_M.gguf",
+      "bytes": 3013027808,
+      "sha256": "13c16f426047e2de38cd075bdade4a7bcbc8c774384876f677740cda65f8a983"
+    },
+    "vocab_size": 248320,
+    "threads": 32,
+    "n_gpu_layers": 0,
+    "max_prompt_tokens": 4096,
+    "context_tokens": 4352,
+    "decode_chunk": 512,
+    "llama_cpp_python_version": "0.3.35",
+    "transformers_version": "5.17.0"
+  },
+  "samples": [
+    {
+      "case": "a",
+      "probabilities": [
+        0.9566493910320958,
+        0.04335060896790425
+      ],
+      "optionIds": [
+        "yes",
+        "no"
+      ],
+      "inputTokens": 114,
+      "seconds": 0.821,
+      "cacheHit": false,
+      "promptSha256": "cbff1056aa5dbc77215b791bb0d87690fce2a3e9ac92d59616e1aaf01f1eddcf"
+    },
+    {
+      "case": "b",
+      "probabilities": [
+        0.5864886204320032,
+        0.4135113795679968
+      ],
+      "optionIds": [
+        "yes",
+        "no"
+      ],
+      "inputTokens": 116,
+      "seconds": 0.38,
+      "cacheHit": true,
+      "promptSha256": "65fdd6d1452b76df364704e7d07c17064db8c08c9d56b0454ad76e478e95e413"
+    },
+    {
+      "case": "risk",
+      "probabilities": [
+        0.9042396897111007,
+        0.03978419278121526,
+        0.055976117507683915
+      ],
+      "optionIds": [
+        "read",
+        "write",
+        "network"
+      ],
+      "inputTokens": 139,
+      "seconds": 1.01,
+      "cacheHit": false,
+      "promptSha256": "171a963a6e46dfb1774e8a9e93f1c0b8dd69883b688f7e7c867b2d08899af53a"
+    },
+    {
+      "case": "relevant",
+      "probabilities": [
+        0.9966574331236147,
+        0.003342566876385398
+      ],
+      "optionIds": [
+        "yes",
+        "no"
+      ],
+      "inputTokens": 119,
+      "seconds": 0.412,
+      "cacheHit": true,
+      "promptSha256": "3e7aef8200f1fe0c819a26e090a39e3f1f4586fbd6c6756222c9f9c4f996fc87"
+    }
+  ],
+  "weightsCheck": {
+    "present": true,
+    "path": "D:\\codeWork\\jev-dsh\\repo\\.local\\models\\Qwen_Qwen3.5-4B-Q4_K_M.gguf",
+    "bytes": 3013027808,
+    "sha256": "13c16f426047e2de38cd075bdade4a7bcbc8c774384876f677740cda65f8a983",
+    "matches": true,
+    "reason": null
+  }
+}

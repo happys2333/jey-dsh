@@ -1,0 +1,75 @@
+{
+  "endpoint": "http://127.0.0.1:1268",
+  "provider": {
+    "kind": "local",
+    "providerVersion": "local_decider/semif-0.3.35",
+    "requestedModel": "bartowski/Qwen_Qwen3.5-4B-GGUF",
+    "resolvedModel": "bartowski/Qwen_Qwen3.5-4B-GGUF@4168f45a16a1290d65a4ec0fa312ae917a4c15d6#Qwen_Qwen3.5-4B-Q4_K_M.gguf",
+    "modelRevision": "4168f45a16a1290d65a4ec0fa312ae917a4c15d6",
+    "weightsDigest": "13c16f426047e2de38cd075bdade4a7bcbc8c774384876f677740cda65f8a983",
+    "tokenizerRevision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+    "templateDigest": "04ebb64be5469bb07dfc5edcc09ccd401b0752b2c0134392d67360278f440800",
+    "quantization": "Q4_K_M",
+    "synthetic": false
+  },
+  "status": "ok",
+  "outcomes": [
+    {
+      "id": "advances-goal",
+      "status": "answered",
+      "answer": {
+        "kind": "boolean",
+        "pYes": 0.7568184184785639,
+        "probability": {
+          "origin": "native-logits",
+          "calibration": "uncalibrated",
+          "calibrationId": null
+        }
+      }
+    },
+    {
+      "id": "evidence-sufficient",
+      "status": "answered",
+      "answer": {
+        "kind": "boolean",
+        "pYes": 0.6726131660016902,
+        "probability": {
+          "origin": "native-logits",
+          "calibration": "uncalibrated",
+          "calibrationId": null
+        }
+      }
+    },
+    {
+      "id": "conflicts-with-constraint",
+      "status": "answered",
+      "answer": {
+        "kind": "boolean",
+        "pYes": 0.1383212382697122,
+        "probability": {
+          "origin": "native-logits",
+          "calibration": "uncalibrated",
+          "calibrationId": null
+        }
+      }
+    }
+  ],
+  "usage": {
+    "inputTokens": 485,
+    "outputTokens": 0,
+    "costUsd": null,
+    "costBasis": "unknown"
+  },
+  "timing": {
+    "queueMs": 0,
+    "inferenceMs": 2672,
+    "totalMs": 2686
+  },
+  "policy": {
+    "action": "abstain",
+    "reasonCodes": [
+      "no-jey-restriction"
+    ],
+    "combined": "allow"
+  }
+}
