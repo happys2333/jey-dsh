@@ -17,6 +17,7 @@ pnpm --filter jey-core test          # 137 条单元
 pnpm --filter jey-core test:property # 16 条属性
 pnpm --filter jey-adapter-dsh test      # 22 条：真实 agent loop 上的宿主闭环、装载入口与外发拒绝
 pnpm --filter jey-provider-typesafe test # 20 条：云端线格式契约，夹具来自官方文档，全程不联网
+pnpm --filter jey-provider-local test   # 14 条：本地评分服务客户端契约（只认字面 loopback 等）
 ```
 
 真实状态逐条记在 `docs/STATUS.md`，未运行的项一律写 `NOT_RUN`/`BLOCKED`，不用工程测试通过冒充模型质量合格。

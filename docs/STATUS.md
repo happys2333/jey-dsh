@@ -88,8 +88,8 @@ pnpm --filter jey-provider-typesafe test  # 20 条契约测试, 20 pass, 0 fail�
 | provider-contract（typesafe） | **PASS** | 线格式逐字取自官方 API 文档（2026-09-23 检索）；出站体断言、`answers` 回镜键集断言、每个 primitive 的取值/键集/求和/一致性断言、403-vs-401、429/529 可重试、3xx 拒绝跟随、取消真的打断出站请求 |
 | 隐私边界 | **PASS** | `snapshot/purpose/budget/requestId` 不出站；凭据缺失时 fetch 调用数为 0；token 不出现在任何错误文本里；审计只记别名不记 URL |
 | cloud-inference | **BLOCKED** | 无 `TYPESAFE_API_KEY`、无调用预算。20 条全是对夹具与桩传输的契约测试，**不是**真实调用记录 |
-| provider-contract（local） | **NOT_RUN** | `jey-provider-local` 与 `python/local_decider` 还没写 |
-| local-inference / local-offline | **BLOCKED** | 缺 Python 环境与权重授权（约 3.01 GB，且启动需取固定 tokenizer） |
+| provider-contract（local） | **PASS（客户端部分）** | 14 条契约测试：只认字面 loopback、预算在本地先拒、3xx 拒绝跟随、取消只承认客户端放弃、能力声明缺模型身份即拒绝、服务端错误码优先于状态默认、发送体只带剩余时限；服务端本体 `python/local_decider` 仍未写 |
+| local-inference / local-offline | **BLOCKED** | Python 3.12.13 已装（uv）、SemIf 依赖正在装；权重（约 3.01 GB）与启动期取固定 tokenizer 待授权后验证。客户端契约通过 ≠ 真实推理通过 |
 
 v1 明确**不重试**：重试只能有一层负责，协调器与提供方同时重试会让请求数相乘。代价是限流会表现为一次失败的检查，由策略层按"必需检查不可用"升级，而不是被静默吞掉。
 
