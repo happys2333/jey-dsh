@@ -63,6 +63,27 @@
           "uniqueItems": true,
           "items": { "type": "string", "pattern": "^https?://[^/*?]+$" },
           "description": "Exact origins. '*' is rejected by the pattern, and request content can never add to this list."
+        },
+        "destinations": {
+          "type": "array",
+          "uniqueItems": true,
+          "description": "Named cloud destinations. All five conditions of spec 5.3 are checked against these: an explicit provider, a credential reference, an allowlisted endpoint, an allowed purpose and allowlisted fields. `id` is the safe alias that reaches the audit log; the full URL never does.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "endpoint", "purposes"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,31}$" },
+              "endpoint": { "type": "string", "pattern": "^https://[^/?]+$" },
+              "purposes": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": { "enum": ["tool-assessment", "tool-relevance", "evidence-check", "explicit-query"] }
+              },
+              "fields": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+            }
+          }
         }
       }
     },

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { Ajv2020 } from 'ajv/dist/2020.js'
 import type { ErrorObject } from 'ajv'
 import type { Mode, Purpose } from 'jey-contracts'
+import type { Destination } from './egress.ts'
 
 /**
  * Config loading. Two separate jobs, deliberately not merged:
@@ -52,6 +53,7 @@ export interface JeyConfig {
     readonly mode: 'deny' | 'local-only' | 'allowlist'
     readonly allowedPurposes?: readonly Purpose[]
     readonly allowedOrigins?: readonly string[]
+    readonly destinations?: readonly Destination[]
   }
   readonly calibration?: {
     readonly id: string

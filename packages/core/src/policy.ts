@@ -129,11 +129,11 @@ function decide(input: {
   }
 
   const missing = requiredQuestionIds.filter(id => !outcomes.some(o => o.id === id && o.status === 'answered'))
-  const unusable = [
+  const unusable = [...new Set([
     ...missing,
     ...outcomes.filter(o => o.status === 'error').map(o => o.id),
     ...outcomes.filter(o => o.status === 'abstained').map(o => o.id),
-  ]
+  ])]
 
   // §4.3: a missing or failed required execution check is never treated as a pass.
   if (unusable.length > 0) {
