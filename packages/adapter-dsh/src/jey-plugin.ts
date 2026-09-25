@@ -12,6 +12,7 @@ import {
 } from 'jey-core'
 import { MockProvider } from './providers/mock.ts'
 import { TypesafeProvider } from 'jey-provider-typesafe'
+import { LocalProvider } from 'jey-provider-local'
 
 /**
  * Jey as a DSH plugin: the only place in this repository that imports the host.
@@ -409,7 +410,8 @@ export function mountJey(ctx: Context, raw: unknown, deps: JeyMountDeps): JeyRun
         ? (outcome.code === 'PROVIDER_ERROR' ? 'INVALID_RESPONSE' : outcome.code)
         : outcome.kind === 'cancelled' ? 'CANCELLED' : 'TIMEOUT'
       const policy = evaluatePolicy({ mode: config.mode, host, approvalChannel, outcomes: errorOutcomes(request, code) })
-      record({ request, ref, truncatedPaths: truncated, reasonCodes: [`coordinator:${outcome.kind}`, ...policy.reasonCodes], action: policy.action, hostDecision: host, observation: null })
+      const why = outcome.kind === 'failed' ? `provider:${outcome.code}` : `coordinator:${outcome.kind}`
+      record({ request, ref, truncatedPaths: truncated, reasonCodes: [why, ...policy.reasonCodes], action: policy.action, hostDecision: host, observation: null })
       return toPreTool(policy.combined)
     }
 
@@ -515,11 +517,9 @@ export function mountJey(ctx: Context, raw: unknown, deps: JeyMountDeps): JeyRun
  * config did not name.
  */
 export function apply(ctx: Context, config: unknown): void {
-  const kind = (config as { provider?: { kind?: string } }).provider?.kind ?? 'unconfigured'
-  if (kind === 'local') {
-    throw new Error('jey: the local provider arrives with M3; refusing to install a plugin that would silently do nothing')
-  }
   ctx.effect(() => {
+    // Constructing the provider outside the validated config path would let a bad
+    // config install and then abstain forever, so any refusal here throws at load.
     const runtime = mountJey(ctx, config, { provider: providerFor(config) })
     return () => runtime.close()
   })
@@ -553,6 +553,14 @@ function providerFor(raw: unknown): DecisionProvider {
   const config = raw as Partial<JeyConfig>
   const provider = config.provider
   if (provider === undefined || provider.kind === 'unconfigured' || provider.kind === 'mock') return new MockProvider()
+  if (provider.kind === 'local') {
+    const local = provider.local
+    if (local === undefined) throw new Error('jey: provider.kind=local without a local block')
+    // External ownership only: Jey never launches, restarts, or downloads anything to
+    // satisfy a decision. An unreachable service answers LOCAL_NOT_READY and the policy
+    // layer escalates, rather than the plugin quietly failing open.
+    return new LocalProvider({ endpoint: local.endpoint, token: () => resolveCredential(local.tokenRef) })
+  }
   if (provider.kind === 'typesafe') {
     const typesafe = provider.typesafe
     const destinationId = config.egress?.destinations?.find((d: { id: string; endpoint: string }) => d.endpoint === typesafe?.endpointOrigin)?.id ?? 'unaliased'

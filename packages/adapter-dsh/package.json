@@ -28,7 +28,8 @@
     "@deepseek-ai/dsh-tools": "0.1.7-alpha.1",
     "jey-contracts": "workspace:*",
     "jey-core": "workspace:*",
-    "jey-provider-typesafe": "workspace:*"
+    "jey-provider-typesafe": "workspace:*",
+    "jey-provider-local": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "22.19.1",

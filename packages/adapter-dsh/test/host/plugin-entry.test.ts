@@ -84,13 +84,63 @@ describe('jey plugin loaded through its real cordis entry point', () => {
     }
   })
 
-  it('refuses to load against the local provider, which M3 has not built yet', async () => {
-    const ctx = new Context()
-    await mountAgentLoopTestDependencies(ctx)
-    await assert.rejects(
-      async () => { await ctx.plugin(jeyPlugin, config({ mode: 'off', provider: { kind: 'local' } })) },
-      /arrives with M3/,
-    )
+  it('degrades honestly when the local service is not there', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'jey-local-'))
+    const path = join(dir, 'diagnostics.jsonl')
+    const previousPath = process.env.JEY_AUDIT_PATH
+    process.env.JEY_AUDIT_PATH = path
+    const realFetch = globalThis.fetch
+    let outbound = 0
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      outbound += 1
+      throw new TypeError(`connect refused to ${String(input)}`)
+    }) as unknown as typeof globalThis.fetch
+    const previousToken = process.env.JEY_LOCAL_TOKEN
+    process.env.JEY_LOCAL_TOKEN = 'a-token-that-never-leaves-this-test'
+
+    try {
+      const ctx = new Context()
+      await mountAgentLoopTestDependencies(ctx)
+      await ctx.plugin(scriptedLlmPlugin)
+      resetProbeToolBodyCalls()
+      ctx.tools.register(probeTool)
+      await ctx.plugin(jeyPlugin, config({
+        mode: 'shadow',
+        provider: {
+          kind: 'local',
+          local: {
+            endpoint: 'http://127.0.0.1:17861/v1/decide',
+            tokenRef: 'env:JEY_LOCAL_TOKEN',
+            ownership: 'external',
+            expectedModel: { requested: 'Qwen3.5-4B', revision: '851bf6e8' },
+          },
+        },
+        egress: { mode: 'local-only', allowedPurposes: ['tool-assessment'], allowedOrigins: ['http://127.0.0.1:17861'] },
+        features: { toolAssessment: true },
+      }))
+      const harness = await mountAgentLoopTestHarness(ctx)
+      const agent = await harness.create(SessionId('jey-local-agent'), { provider: PROBE_LLM_ROUTE, model: 'local-model' })
+      const settled = nextIdle(ctx, agent)
+      agent.followup(createUserMessage({ content: [{ type: 'text', text: 'check this' }], source: { kind: 'user' } }))
+      await settled
+
+      assert.equal(outbound, 1, 'the local origin was allowlisted, so the attempt was made')
+      assert.equal(probeToolBodyCalls().length, 1, 'an unreachable scorer must not block execution in shadow')
+      const [record] = scanJournal(readFileSync(path, 'utf8')).confirmed
+      assert.ok(record)
+      assert.equal(record.kind, 'decision')
+      if (record.kind !== 'decision') return
+      assert.ok(record.reasonCodes.some(c => c === 'provider:LOCAL_NOT_READY'), JSON.stringify(record.reasonCodes))
+      assert.equal(record.action, 'abstain')
+      await ctx.fiber.dispose()
+    } finally {
+      globalThis.fetch = realFetch
+      if (previousPath === undefined) delete process.env.JEY_AUDIT_PATH
+      else process.env.JEY_AUDIT_PATH = previousPath
+      if (previousToken === undefined) delete process.env.JEY_LOCAL_TOKEN
+      else process.env.JEY_LOCAL_TOKEN = previousToken
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   it('will not send state to a cloud destination that was never allowlisted', async () => {
