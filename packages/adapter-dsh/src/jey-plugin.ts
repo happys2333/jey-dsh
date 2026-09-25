@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { appendFileSync, mkdirSync, renameSync, statSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync, renameSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { Context, Events } from '@deepseek-ai/cordis'
 import type {
@@ -11,6 +11,7 @@ import {
   type AuditEvent, type HostCapabilities, type JeyConfig, type LineSink, type ProgressStore, type StateSection,
 } from 'jey-core'
 import { MockProvider } from './providers/mock.ts'
+import { TypesafeProvider } from 'jey-provider-typesafe'
 
 /**
  * Jey as a DSH plugin: the only place in this repository that imports the host.
@@ -378,10 +379,14 @@ export function mountJey(ctx: Context, raw: unknown, deps: JeyMountDeps): JeyRun
     const touchesNetwork = config.provider.kind === 'local' || config.provider.kind === 'typesafe'
     const egress = touchesNetwork
       ? checkEgress(
-        { mode: config.egress.mode, localOrigins: config.egress.allowedOrigins ?? [] },
+        {
+          mode: config.egress.mode,
+          localOrigins: config.egress.allowedOrigins ?? [],
+          destinations: config.egress.destinations ?? [],
+        },
         {
           providerKind: config.provider.kind,
-          destinationId: config.provider.kind === 'typesafe' ? 'configured' : null,
+          destinationId: config.egress.destinations?.find(d => d.endpoint === config.provider.typesafe?.endpointOrigin)?.id ?? null,
           endpoint: config.provider.local?.endpoint ?? config.provider.typesafe?.endpointOrigin ?? null,
           purpose: request.purpose,
           fields,
@@ -511,13 +516,53 @@ export function mountJey(ctx: Context, raw: unknown, deps: JeyMountDeps): JeyRun
  */
 export function apply(ctx: Context, config: unknown): void {
   const kind = (config as { provider?: { kind?: string } }).provider?.kind ?? 'unconfigured'
-  if (kind !== 'mock' && kind !== 'unconfigured') {
-    throw new Error(`jey: provider '${kind}' is not implemented yet; local and cloud providers arrive with M3`)
+  if (kind === 'local') {
+    throw new Error('jey: the local provider arrives with M3; refusing to install a plugin that would silently do nothing')
   }
   ctx.effect(() => {
-    const runtime = mountJey(ctx, config, { provider: new MockProvider() })
+    const runtime = mountJey(ctx, config, { provider: providerFor(config) })
     return () => runtime.close()
   })
+}
+
+/**
+ * Resolve a credential *reference*. A bare key never appears in config, and no provider
+ * reads an environment variable on its own initiative: `env:NAME` must be written out.
+ */
+export function resolveCredential(reference: string | undefined): string | undefined {
+  if (reference === undefined) return undefined
+  const separator = reference.indexOf(':')
+  if (separator < 0) return undefined
+  const scheme = reference.slice(0, separator)
+  const rest = reference.slice(separator + 1)
+  if (scheme === 'env') return process.env[rest]
+  if (scheme === 'file') {
+    try {
+      return readFileSync(rest, 'utf8').trim()
+    } catch {
+      return undefined
+    }
+  }
+  // `keystore:` and anything else are unwired; returning undefined makes the provider
+  // refuse the request instead of sending it unauthenticated.
+  return undefined
+}
+
+/** Built from the raw config so a rejected config never reaches a provider constructor. */
+function providerFor(raw: unknown): DecisionProvider {
+  const config = raw as Partial<JeyConfig>
+  const provider = config.provider
+  if (provider === undefined || provider.kind === 'unconfigured' || provider.kind === 'mock') return new MockProvider()
+  if (provider.kind === 'typesafe') {
+    const typesafe = provider.typesafe
+    const destinationId = config.egress?.destinations?.find((d: { id: string; endpoint: string }) => d.endpoint === typesafe?.endpointOrigin)?.id ?? 'unaliased'
+    return new TypesafeProvider({
+      model: typesafe?.model ?? '',
+      credential: () => resolveCredential(typesafe?.credentialRef),
+      destinationId,
+    })
+  }
+  throw new Error(`jey: no provider implementation for '${provider?.kind}'`)
 }
 
 export const name = 'jey'
