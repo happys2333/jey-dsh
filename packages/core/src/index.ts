@@ -108,3 +108,15 @@ export {
   type LineSink,
   type ScanResult,
 } from './audit.ts'
+
+export {
+  EMPTY_BUDGET,
+  keyOf,
+  refundBudget,
+  reserveBudget,
+  spent,
+  type BudgetKey,
+  type BudgetLedger,
+  type BudgetLimits,
+  type BudgetVerdict,
+} from "./budget.ts"

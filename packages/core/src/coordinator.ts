@@ -1,6 +1,7 @@
 import type { DecisionProvider, DecisionRequest, DecisionResponse, ErrorCode, HostDecision, PolicyDecision, SnapshotRef } from 'jey-contracts'
 import { isFresh } from './snapshot.ts'
 import { combineHostAndJey } from './policy.ts'
+import { EMPTY_BUDGET, keyOf, refundBudget, reserveBudget, type BudgetLedger } from './budget.ts'
 
 /**
  * The request lifecycle of spec 4.4 plus the queueing rules of 10.2.
@@ -92,7 +93,8 @@ export interface GuardedApplication {
 
 export type CoordinatorOutcome =
   | { readonly kind: 'response'; readonly response: DecisionResponse; readonly application: GuardedApplication }
-  | { readonly kind: 'queue-full'; readonly retryable: true }
+  | { readonly kind: 'queue-full'; readonly retryable: true; readonly scope: 'global' | 'session' }
+  | { readonly kind: 'budget-exceeded'; readonly scope: 'turn' | 'session'; readonly used: number; readonly limit: number }
   | { readonly kind: 'timed-out'; readonly stage: 'queue' | 'inference' }
   | { readonly kind: 'cancelled' }
   | { readonly kind: 'duplicate' }
@@ -103,6 +105,14 @@ export interface CoordinatorLimits {
   readonly maxConcurrent: number
   readonly maxQueue: number
   readonly deadlineMs: number
+  readonly perTurnCalls: number
+  readonly perSessionCalls: number
+  /**
+   * How many runs one session may have waiting at once. Fairness policy, not a user
+   * knob: derived by the caller from `maxConcurrent` so a single chatty session cannot
+   * occupy the whole queue and starve every other agent.
+   */
+  readonly maxQueuePerSession: number
 }
 
 export interface CoordinatorOptions {
@@ -131,7 +141,10 @@ export class DecisionCoordinator {
   #now: () => number
   #onDiagnostic: (e: { key: string; kind: string }) => void
   #inflight = 0
-  #queue: Waiter[] = []
+  /** One queue per session, drained round-robin: a chatty agent cannot starve the others. */
+  #queues = new Map<string, Waiter[]>()
+  #cursor = 0
+  #budget: BudgetLedger = EMPTY_BUDGET
   #settled = new Set<string>()
   #localControls = new Set<AbortController>()
   #closed = false
@@ -143,8 +156,39 @@ export class DecisionCoordinator {
     this.#onDiagnostic = options.onDiagnostic ?? (() => undefined)
   }
 
-  get stats(): { readonly inflight: number; readonly queued: number; readonly settled: number } {
-    return { inflight: this.#inflight, queued: this.#queue.length, settled: this.#settled.size }
+  get stats(): {
+    readonly inflight: number
+    readonly queued: number
+    readonly settled: number
+    readonly budget: BudgetLedger
+  } {
+    return { inflight: this.#inflight, queued: this.#queued(), settled: this.#settled.size, budget: this.#budget }
+  }
+
+  #queued(): number {
+    let total = 0
+    for (const list of this.#queues.values()) total += list.length
+    return total
+  }
+
+  /** Take the next waiter in session rotation, not from the head of one busy session. */
+  #nextWaiter(): Waiter | undefined {
+    const keys = [...this.#queues.keys()]
+    if (keys.length === 0) return undefined
+    for (let offset = 0; offset < keys.length; offset++) {
+      const index = (this.#cursor + offset) % keys.length
+      const key = keys[index] as string
+      const list = this.#queues.get(key) as Waiter[]
+      if (list.length === 0) {
+        this.#queues.delete(key)
+        continue
+      }
+      const waiter = list.shift() as Waiter
+      if (list.length === 0) this.#queues.delete(key)
+      this.#cursor = (index + 1) % keys.length
+      return waiter
+    }
+    return undefined
   }
 
   /**
@@ -158,19 +202,38 @@ export class DecisionCoordinator {
 
     if (this.#settled.has(run.key)) return Promise.resolve({ kind: 'duplicate' })
 
+    const budgetKey = keyOf(request)
+    const reservation = reserveBudget(this.#budget, budgetKey, {
+      perTurnCalls: this.#limits.perTurnCalls,
+      perSessionCalls: this.#limits.perSessionCalls,
+    })
+    if (!reservation.allowed) {
+      run.to('failed').to('recorded')
+      this.#settled.add(run.key)
+      return Promise.resolve({ kind: 'budget-exceeded', scope: reservation.scope, used: reservation.used, limit: reservation.limit })
+    }
+    this.#budget = reservation.ledger
+
     if (this.#inflight >= this.#limits.maxConcurrent) {
-      if (this.#queue.length >= this.#limits.maxQueue) {
+      const sessionId = budgetKey.sessionId
+      const refusal = (scope: 'global' | 'session'): Promise<CoordinatorOutcome> => {
+        this.#budget = refundBudget(this.#budget, budgetKey)
         run.to('queued').to('failed').to('recorded')
         this.#settled.add(run.key)
-        return Promise.resolve({ kind: 'queue-full', retryable: true })
+        return Promise.resolve({ kind: 'queue-full', retryable: true, scope })
       }
+      if (this.#queued() >= this.#limits.maxQueue) return refusal('global')
+      if ((this.#queues.get(sessionId)?.length ?? 0) >= this.#limits.maxQueuePerSession) return refusal('session')
+
       return new Promise<CoordinatorOutcome>(resolve => {
         const waiter: Waiter = { run, resolve, signal: context.signal, startedAt: this.#now(), onAbort: () => this.#abortWaiter(waiter) }
         context.signal.addEventListener('abort', waiter.onAbort, { once: true })
         // A queued run holds a *queue* slot, not an execution slot; counting it as
         // inflight would make #pump unable to ever satisfy its own condition.
         run.to('queued')
-        this.#queue.push(waiter)
+        const list = this.#queues.get(sessionId) ?? []
+        list.push(waiter)
+        this.#queues.set(sessionId, list)
       })
     }
 
@@ -181,9 +244,16 @@ export class DecisionCoordinator {
   /** Only ever called for a waiter that has not started running yet. */
   #abortWaiter(waiter: Waiter | undefined): void {
     if (waiter === undefined) return
-    const index = this.#queue.indexOf(waiter)
-    if (index >= 0) this.#queue.splice(index, 1)
+    const sessionId = waiter.run.request.snapshot.sessionId
+    const list = this.#queues.get(sessionId)
+    if (list !== undefined) {
+      const index = list.indexOf(waiter)
+      if (index >= 0) list.splice(index, 1)
+      if (list.length === 0) this.#queues.delete(sessionId)
+    }
     if (isClosed(waiter.run.phase)) return
+    // Reservation returned: the run never started, so it must not have paid for budget.
+    this.#budget = refundBudget(this.#budget, keyOf(waiter.run.request))
     waiter.run.to('cancelled').to('recorded')
     this.#settled.add(waiter.run.key)
     waiter.signal.removeEventListener('abort', waiter.onAbort)
@@ -197,14 +267,16 @@ export class DecisionCoordinator {
 
   /** Start anything waiting, respecting the deadline that has already been spent. */
   #pump(): void {
-    while (this.#queue.length > 0 && this.#inflight < this.#limits.maxConcurrent) {
-      const waiter = this.#queue.shift() as Waiter
+    while (this.#inflight < this.#limits.maxConcurrent) {
+      const waiter = this.#nextWaiter()
+      if (waiter === undefined) return
       if (waiter.signal.aborted) {
         this.#abortWaiter(waiter)
         continue
       }
-      const spent = this.#now() - waiter.startedAt
-      if (spent >= this.#limits.deadlineMs) {
+      const spentMs = this.#now() - waiter.startedAt
+      if (spentMs >= this.#limits.deadlineMs) {
+        this.#budget = refundBudget(this.#budget, keyOf(waiter.run.request))
         waiter.run.to('timed_out').to('recorded')
         this.#settled.add(waiter.run.key)
         waiter.signal.removeEventListener('abort', waiter.onAbort)
@@ -225,6 +297,7 @@ export class DecisionCoordinator {
   async #execute(run: Run, signal: AbortSignal, startedAt: number): Promise<CoordinatorOutcome> {
     if (signal.aborted) {
       this.#release()
+      this.#budget = refundBudget(this.#budget, keyOf(run.request))
       run.to('cancelled').to('recorded')
       this.#settled.add(run.key)
       this.#pump()
@@ -234,6 +307,7 @@ export class DecisionCoordinator {
     // A queue wait that already ate the deadline must not then spend model budget.
     if (this.#now() - startedAt >= this.#limits.deadlineMs) {
       this.#release()
+      this.#budget = refundBudget(this.#budget, keyOf(run.request))
       run.to('timed_out').to('recorded')
       this.#settled.add(run.key)
       this.#pump()
@@ -330,7 +404,11 @@ export class DecisionCoordinator {
   /** Stop admitting, abort what is in flight, drain nothing new. */
   async close(): Promise<void> {
     this.#closed = true
-    while (this.#queue.length > 0) this.#abortWaiter(this.#queue.shift() as Waiter)
+    let waiter = this.#nextWaiter()
+    while (waiter !== undefined) {
+      this.#abortWaiter(waiter)
+      waiter = this.#nextWaiter()
+    }
     // Stop admitting, then abort what is in flight, then close the provider.
     for (const control of this.#localControls) control.abort(new Error('jey-closing'))
     this.#localControls.clear()

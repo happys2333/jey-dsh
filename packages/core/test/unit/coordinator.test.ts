@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import type { DecisionProvider, DecisionRequest, DecisionResponse, ProviderCapabilities, QuestionOutcome, SnapshotRef } from 'jey-contracts'
-import { DecisionCoordinator, IllegalTransition, Run, canTransition, isClosed, type CoordinatorLimits, type CoordinatorOutcome } from '../../src/index.ts'
+import { DecisionCoordinator, IllegalTransition, Run, canTransition, isClosed, keyOf, spent, type CoordinatorLimits, type CoordinatorOutcome } from '../../src/index.ts'
 
 const IDS = { goal: 'advances-goal', evidence: 'evidence-sufficient', conflict: 'conflicts-with-constraint' }
 
@@ -77,7 +77,7 @@ const immediate = (probabilities?: Record<string, number>): Behaviour => async (
 
 function coordinator(provider: DecisionProvider, limits: Partial<CoordinatorLimits> = {}, diagnostics: { key: string; kind: string }[] = []): DecisionCoordinator {
   return new DecisionCoordinator(provider, {
-    limits: { maxConcurrent: 2, maxQueue: 4, deadlineMs: 200, ...limits },
+    limits: { maxConcurrent: 2, maxQueue: 4, deadlineMs: 200, perTurnCalls: 64, perSessionCalls: 512, maxQueuePerSession: 2, ...limits },
     onDiagnostic: e => diagnostics.push(e),
   })
 }
@@ -141,7 +141,7 @@ test('a saturated coordinator refuses admission synchronously and never calls th
   const c = coordinator(provider, { maxConcurrent: 1, maxQueue: 0 })
   const running = c.submit(request('a'), { signal: new AbortController().signal })
   const rejected: Promise<CoordinatorOutcome> = c.submit(request('b'), { signal: new AbortController().signal })
-  assert.deepEqual(await rejected, { kind: 'queue-full', retryable: true })
+  assert.deepEqual(await rejected, { kind: 'queue-full', retryable: true, scope: 'global' })
   assert.equal(provider.calls, 1)
   gate.resolve(response(request('a')))
   await running
@@ -241,4 +241,100 @@ test('the lifecycle table is closed at the end and rejects skips', () => {
   assert.equal(canTransition('recorded', 'observed'), false)
   assert.equal(isClosed('recorded'), true)
   assert.throws(() => run.to('observed'), IllegalTransition)
+})
+
+test('two sessions sharing an agent id still get their own turn allowance', async () => {
+  const provider = new ScriptedProvider(async (_i, req) => response(req))
+  const c = coordinator(provider, { perTurnCalls: 1 })
+  assert.equal((await c.submit(request('t1', ref({ sessionId: 'sA' })), { signal: new AbortController().signal })).kind, 'response')
+  assert.equal((await c.submit(request('t2', ref({ sessionId: 'sB' })), { signal: new AbortController().signal })).kind, 'response',
+    'the second session is not blocked by the first one spending its turn')
+  assert.equal((await c.submit(request('t3', ref({ sessionId: 'sA' })), { signal: new AbortController().signal })).kind, 'budget-exceeded')
+})
+
+test('a turn cannot exceed its call budget', async () => {
+  const provider = new ScriptedProvider(async (_i, req) => response(req))
+  const c = coordinator(provider, { perTurnCalls: 2 })
+  assert.equal((await c.submit(request('a1'), { signal: new AbortController().signal })).kind, 'response')
+  assert.equal((await c.submit(request('a2'), { signal: new AbortController().signal })).kind, 'response')
+  assert.deepEqual(await c.submit(request('a3'), { signal: new AbortController().signal }),
+    { kind: 'budget-exceeded', scope: 'turn', used: 2, limit: 2 })
+  assert.equal(provider.calls, 2, 'a refused call must not be paid for')
+})
+
+test('a new turn gets its own allowance but the session ceiling still applies', async () => {
+  const provider = new ScriptedProvider(async (_i, req) => response(req))
+  const c = coordinator(provider, { perTurnCalls: 2, perSessionCalls: 3 })
+  const t0 = { turn: 0 }
+  const t1 = { turn: 1 }
+  assert.equal((await c.submit(request('b1', ref(t0)), { signal: new AbortController().signal })).kind, 'response')
+  assert.equal((await c.submit(request('b2', ref(t0)), { signal: new AbortController().signal })).kind, 'response')
+  assert.equal((await c.submit(request('b3', ref(t1)), { signal: new AbortController().signal })).kind, 'response',
+    'the turn counter reset, so a fresh turn is not blocked by the previous one')
+  assert.deepEqual(await c.submit(request('b4', ref(t1)), { signal: new AbortController().signal }),
+    { kind: 'budget-exceeded', scope: 'session', used: 3, limit: 3 })
+})
+
+test('a run that timed out in the queue gives its reservation back', async () => {
+  const gate = deferred()
+  let calls = 0
+  const provider = new ScriptedProvider(async (_i, req) => {
+    calls += 1
+    return calls === 1 ? gate.promise : response(req)
+  })
+  const c = coordinator(provider, { maxConcurrent: 1, deadlineMs: 5 })
+  const running = c.submit(request('q1'), { signal: new AbortController().signal })
+  const queued = await c.submit(request('q2'), { signal: new AbortController().signal })
+  await new Promise(r => setTimeout(r, 30))
+  gate.resolve(response(request('q1')))
+  await running
+  assert.deepEqual(queued, { kind: 'timed-out', stage: 'queue' })
+  assert.deepEqual(spent(c.stats.budget, keyOf(request('q2'))), { turn: 1, session: 1 },
+    'only the run that actually reached the provider is charged')
+})
+
+test('one session cannot starve another out of the queue', async () => {
+  const gate = deferred()
+  const seen: string[] = []
+  let first = true
+  const provider = new ScriptedProvider(async (_i, req) => {
+    seen.push(req.requestId)
+    if (first) {
+      first = false
+      return gate.promise
+    }
+    return response(req)
+  })
+  const c = coordinator(provider, { maxConcurrent: 1, maxQueue: 6, deadlineMs: 1000, maxQueuePerSession: 2 })
+  const pending = [
+    c.submit(request('a1', ref({ sessionId: 'sA', agentId: 'aA' })), { signal: new AbortController().signal }),
+    c.submit(request('b1', ref({ sessionId: 'sB', agentId: 'aB' })), { signal: new AbortController().signal }),
+    c.submit(request('b2', ref({ sessionId: 'sB', agentId: 'aB' })), { signal: new AbortController().signal }),
+    c.submit(request('a2', ref({ sessionId: 'sA', agentId: 'aA' })), { signal: new AbortController().signal }),
+  ]
+  gate.resolve(response(request('a1')))
+  await Promise.all(pending)
+
+  // Plain FIFO would serve b1, b2, a2; rotation interleaves the sessions instead.
+  assert.deepEqual(seen, ['a1', 'b1', 'a2', 'b2'])
+})
+
+test('a session that filled its own queue is refused while another still has room', async () => {
+  const gate = deferred()
+  const provider = new ScriptedProvider(() => gate.promise)
+  const c = coordinator(provider, { maxConcurrent: 1, maxQueue: 8, deadlineMs: 1000, maxQueuePerSession: 1 })
+  const running = c.submit(request('x1', ref({ sessionId: 'sA', agentId: 'aA' })), { signal: new AbortController().signal })
+  const queuedA = c.submit(request('x2', ref({ sessionId: 'sA', agentId: 'aA' })), { signal: new AbortController().signal })
+
+  assert.deepEqual(await c.submit(request('x3', ref({ sessionId: 'sA', agentId: 'aA' })), { signal: new AbortController().signal }),
+    { kind: 'queue-full', retryable: true, scope: 'session' })
+
+  // The global queue is nowhere near its bound, so a different session is still admitted.
+  const queuedB = c.submit(request('y1', ref({ sessionId: 'sB', agentId: 'aB' })), { signal: new AbortController().signal })
+  assert.equal(provider.calls, 1, 'only the running call has reached the provider')
+
+  gate.resolve(response(request('x1')))
+  await Promise.all([running, queuedA, queuedB])
+  assert.equal(provider.calls, 3)
+  assert.equal(c.stats.queued, 0)
 })
