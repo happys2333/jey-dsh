@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jey-local-decider"
+version = "0.0.0"
+description = "Loopback-only structured decision service for Jey, on pinned CPU GGUF weights"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  # Pinned to the exact commit this repository was built and tested against, not to a
+  # moving branch. The upstream fork is not published to an index, so there is no
+  # version here that pip could resolve without a source.
+  "semif-phase1[llamacpp] @ git+https://github.com/TheoLeeCJ/SemIf.git@1f2dea3e25379f9dfc98cb83c324f00ab5deda37",
+]
+
+[project.scripts]
+jey-local-decider = "local_decider.service:main"
+jey-local-weights = "local_decider.download_weights:main"
+
+[tool.setuptools.packages.find]
+include = ["local_decider*"]

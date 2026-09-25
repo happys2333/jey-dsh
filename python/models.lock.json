@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "1",
+  "note": "Pinned identity for the local CPU scorer. Revisions are the upstream heads recorded on 2026-09-25 via the public huggingface.co API; sha256/bytes are the LFS object metadata the hub reports for that exact filename, so a completed download can be verified without trusting the transport.",
+  "upstreamCaveat": "bartowski's quantized repackaging is not the original Qwen license grant. Check the upstream model license before redistributing or shipping weights; this repository downloads them on demand and never commits them.",
+  "reference": {
+    "repository": "Qwen/Qwen3.5-4B",
+    "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+    "usage": "tokenizer and chat template only; the safetensors weights are never downloaded",
+    "files": [
+      "tokenizer.json",
+      "tokenizer_config.json",
+      "vocab.json",
+      "merges.txt",
+      "chat_template.jinja",
+      "config.json"
+    ]
+  },
+  "weights": {
+    "repository": "bartowski/Qwen_Qwen3.5-4B-GGUF",
+    "revision": "4168f45a16a1290d65a4ec0fa312ae917a4c15d6",
+    "file": "Qwen_Qwen3.5-4B-Q4_K_M.gguf",
+    "quantization": "Q4_K_M",
+    "sha256": "13c16f426047e2de38cd075bdade4a7bcbc8c774384876f677740cda65f8a983",
+    "bytes": 3013027808,
+    "xetHash": "2bb8720c415a23f67dcbcfb434f3d9e7e7bea1530f5c359f16d16887bc3fd727"
+  },
+  "backend": {
+    "package": "semif-phase1",
+    "version": "0.1.0",
+    "source": "vendored fork pinned in .work/vendor/semif",
+    "extra": "llamacpp",
+    "llamaCppPython": "0.3.35",
+    "contextTokens": 4096,
+    "threads": null
+  },
+  "cache": {
+    "huggingfaceHome": ".local/hf-cache",
+    "weightsDir": ".local/models"
+  }
+}
