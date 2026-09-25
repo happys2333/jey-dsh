@@ -7,8 +7,8 @@ import type {
 } from 'jey-contracts'
 import {
   AuditJournal, DecisionCoordinator, EMPTY_PROGRESS, assessmentState, buildSnapshot, checkEgress,
-  compileAssessment, evaluatePolicy, loadConfig, mintAuditId, observeCall, sha256, shouldBlockDispatch,
-  type AuditEvent, type HostCapabilities, type JeyConfig, type LineSink, type ProgressStore,
+  compileAssessment, evaluatePolicy, fitToBudget, loadConfig, mintAuditId, observeCall, sha256, shouldBlockDispatch,
+  type AuditEvent, type HostCapabilities, type JeyConfig, type LineSink, type ProgressStore, type StateSection,
 } from 'jey-core'
 import { MockProvider } from './providers/mock.ts'
 
@@ -156,7 +156,16 @@ export function mountJey(ctx: Context, raw: unknown, deps: JeyMountDeps): JeyRun
     now,
   })
   const coordinator = new DecisionCoordinator(deps.provider, {
-    limits: { maxConcurrent: config.limits.maxConcurrent, maxQueue: config.limits.maxQueue, deadlineMs: config.limits.deadlineMs },
+    limits: {
+      maxConcurrent: config.limits.maxConcurrent,
+      maxQueue: config.limits.maxQueue,
+      deadlineMs: config.limits.deadlineMs,
+      perTurnCalls: config.limits.perTurnCalls,
+      perSessionCalls: config.limits.perSessionCalls,
+      // Fairness, not a user knob: one session may not queue more than the host can run
+      // at once, otherwise a single chatty agent starves every other one.
+      maxQueuePerSession: Math.max(1, config.limits.maxConcurrent),
+    },
     now,
     onDiagnostic: event => {
       journal.emit({ kind: 'diagnostic', auditId: mintAuditId(), requestId: event.key, sessionId: '', reason: event.kind, at: now() })
@@ -173,6 +182,9 @@ export function mountJey(ctx: Context, raw: unknown, deps: JeyMountDeps): JeyRun
   // wrongly confirm one. Per-scope digests need a host identity we cannot see at assemble
   // time; that is recorded as a known gap rather than papered over.
   let catalogDigest = `sha256:${sha256('[]')}`
+  const conversation: { readonly role: string; readonly text: string }[] = []
+  const recentResults: { readonly toolName: string; readonly status: string }[] = []
+  const HISTORY_CAP = 40
 
   const runtime = {
     config,
@@ -191,7 +203,16 @@ export function mountJey(ctx: Context, raw: unknown, deps: JeyMountDeps): JeyRun
     readonly toolName: string
     readonly arguments: JsonValue
     readonly approvalChannel: boolean
-  }): { readonly ref: SnapshotRef; readonly request: DecisionRequest; readonly fields: readonly string[] } {
+  }): { readonly ref: SnapshotRef; readonly request: DecisionRequest; readonly fields: readonly string[]; readonly truncated: readonly string[]; readonly neededBytes: number | null } {
+    // §5.2 order: hard policy and this call first, then recent results, then conversation.
+    // Cutting happens at JSON boundaries and every removal is recorded on the snapshot.
+    const sections: StateSection[] = [
+      { id: 'policy', kind: 'policy', value: { mode: config.mode, constraints: [] as string[] } },
+      { id: 'call', kind: 'current-call', value: assessmentState({ toolName: args.toolName, frozenArguments: args.arguments, goal: goalText, constraints: [] }) },
+      { id: 'results', kind: 'recent-result', value: recentResults.slice(-5) },
+      { id: 'chat', kind: 'conversation', value: conversation.slice(-12) },
+    ]
+    const fit = fitToBudget(sections, config.limits.maxStateBytes)
     const built = buildSnapshot({
       sessionId: args.agentId,
       agentId: args.agentId,
@@ -211,21 +232,26 @@ export function mountJey(ctx: Context, raw: unknown, deps: JeyMountDeps): JeyRun
       },
       catalog: [{ name: args.toolName, schemaDigest: catalogDigest }],
       call: { toolName: args.toolName, frozenArguments: args.arguments, executionToken: args.agentId, observationSequence: sequence },
-      recentResults: [],
+      recentResults: recentResults.slice(-5),
       observationSequence: sequence,
-      truncated: [],
+      truncated: fit.ok ? fit.omissions.map(o => o.path) : [`insufficient:${fit.code}`],
     })
-    const state = assessmentState({ toolName: args.toolName, frozenArguments: args.arguments, goal: goalText, constraints: [] })
     const request: DecisionRequest = {
       schemaVersion: '1',
       requestId: `req_${randomUUID()}`,
       purpose: 'tool-assessment',
       snapshot: built.ref,
-      state,
+      state: fit.ok ? fit.state : {},
       questions: compileAssessment(),
       budget: { maxElapsedMs: config.limits.deadlineMs, maxInputBytes: config.limits.maxStateBytes },
     }
-    return { ref: built.ref, request, fields: Object.keys(state) }
+    return {
+      ref: built.ref,
+      request,
+      fields: fit.ok ? Object.keys(fit.state) : [],
+      truncated: built.facts.truncated,
+      neededBytes: fit.ok ? null : fit.neededBytes,
+    }
   }
 
   /**
@@ -240,6 +266,7 @@ export function mountJey(ctx: Context, raw: unknown, deps: JeyMountDeps): JeyRun
     readonly hostDecision: HostDecision | null
     readonly observation: { providerKind: AuditEvent['providerKind']; model: string; templateDigest: string; synthetic: boolean; egress: boolean; statuses: AuditEvent['questionStatuses']; timing: AuditEvent['timing'] } | null
     readonly stale?: boolean
+    readonly truncatedPaths: readonly string[]
   }): void {
     const event: AuditEvent = {
       kind: 'decision',
@@ -261,6 +288,7 @@ export function mountJey(ctx: Context, raw: unknown, deps: JeyMountDeps): JeyRun
       failureCode: null,
       egressOccurred: input.observation?.egress ?? false,
       stale: input.stale ?? false,
+      truncatedPaths: input.truncatedPaths,
       at: now(),
     }
     records.push(event)
@@ -298,6 +326,8 @@ export function mountJey(ctx: Context, raw: unknown, deps: JeyMountDeps): JeyRun
     if (text.length > 0) {
       goalText = text
       goalSeen = true
+      conversation.push({ role: 'user', text })
+      if (conversation.length > HISTORY_CAP) conversation.shift()
     }
   }
 
@@ -307,13 +337,21 @@ export function mountJey(ctx: Context, raw: unknown, deps: JeyMountDeps): JeyRun
 
     const agentId = exec.agent?.id ?? 'agentless'
     const approvalChannel = exec.agent !== undefined && ctx.get('approval') !== undefined
-    const { ref, request, fields } = snapshot({
+    const { ref, request, fields, truncated, neededBytes } = snapshot({
       agentId,
       toolName: exec.name,
       arguments: exec.arguments as JsonValue,
       approvalChannel,
     })
     const violations = hardRules(exec.name)
+
+    if (neededBytes !== null) {
+      // The call's own arguments did not fit. Trimming them and answering anyway would
+      // be a verdict about text the provider never saw (spec 5.2).
+      const policy = evaluatePolicy({ mode: config.mode, host, approvalChannel, outcomes: errorOutcomes(request, 'INSUFFICIENT_CONTEXT') })
+      record({ request, ref, truncatedPaths: truncated, reasonCodes: [`insufficient-context:${neededBytes}`, ...policy.reasonCodes], action: policy.action, hostDecision: host, observation: null })
+      return toPreTool(policy.combined)
+    }
 
     if (violations.length > 0) {
       // Deterministic rules hold regardless of mode, including shadow. `shadow` means a
@@ -324,13 +362,13 @@ export function mountJey(ctx: Context, raw: unknown, deps: JeyMountDeps): JeyRun
         ? host
         : { kind: 'deny', reason: `jey: ${violations.join(', ')}` }
       const policy = evaluatePolicy({ mode: config.mode, host, hardRuleViolations: violations, approvalChannel })
-      record({ request, ref, reasonCodes: policy.reasonCodes, action: 'deny', hostDecision: host, observation: null })
+      record({ request, ref, truncatedPaths: truncated, reasonCodes: policy.reasonCodes, action: 'deny', hostDecision: host, observation: null })
       return toPreTool(decision)
     }
 
     if (runtime.auditBlocked) {
       const reason = 'jey: audit required but unwritable'
-      record({ request, ref, reasonCodes: ['audit-blocked'], action: 'deny', hostDecision: host, observation: null })
+      record({ request, ref, truncatedPaths: truncated, reasonCodes: ['audit-blocked'], action: 'deny', hostDecision: host, observation: null })
       return { kind: 'deny', reason }
     }
 
@@ -356,7 +394,7 @@ export function mountJey(ctx: Context, raw: unknown, deps: JeyMountDeps): JeyRun
       const policy = evaluatePolicy({
         mode: config.mode, host, approvalChannel, outcomes: errorOutcomes(request, 'EGRESS_DENIED'),
       })
-      record({ request, ref, reasonCodes: [...egress.reasons, ...policy.reasonCodes], action: policy.action, hostDecision: host, observation: null })
+      record({ request, ref, truncatedPaths: truncated, reasonCodes: [...egress.reasons, ...policy.reasonCodes], action: policy.action, hostDecision: host, observation: null })
       return toPreTool(policy.combined)
     }
 
@@ -366,7 +404,7 @@ export function mountJey(ctx: Context, raw: unknown, deps: JeyMountDeps): JeyRun
         ? (outcome.code === 'PROVIDER_ERROR' ? 'INVALID_RESPONSE' : outcome.code)
         : outcome.kind === 'cancelled' ? 'CANCELLED' : 'TIMEOUT'
       const policy = evaluatePolicy({ mode: config.mode, host, approvalChannel, outcomes: errorOutcomes(request, code) })
-      record({ request, ref, reasonCodes: [`coordinator:${outcome.kind}`, ...policy.reasonCodes], action: policy.action, hostDecision: host, observation: null })
+      record({ request, ref, truncatedPaths: truncated, reasonCodes: [`coordinator:${outcome.kind}`, ...policy.reasonCodes], action: policy.action, hostDecision: host, observation: null })
       return toPreTool(policy.combined)
     }
 
@@ -412,14 +450,14 @@ export function mountJey(ctx: Context, raw: unknown, deps: JeyMountDeps): JeyRun
       const fallback: HostDecision = approvalChannel
         ? { kind: 'ask', reason: 'jey: snapshot stale' }
         : { kind: 'deny', reason: 'jey: snapshot stale' }
-      record({ request, ref, reasonCodes: ['stale-snapshot', ...policy.reasonCodes], action: policy.action, hostDecision: host, observation, stale: true })
+      record({ request, ref, truncatedPaths: truncated, reasonCodes: ['stale-snapshot', ...policy.reasonCodes], action: policy.action, hostDecision: host, observation, stale: true })
       return toPreTool(host.kind === 'deny' || host.kind === 'cancel' ? host : fallback)
     }
     if (resolution.kind === 'already-applied') {
-      record({ request, ref, reasonCodes: ['already-applied'], action: 'abstain', hostDecision: host, observation })
+      record({ request, ref, truncatedPaths: truncated, reasonCodes: ['already-applied'], action: 'abstain', hostDecision: host, observation })
       return toPreTool(host)
     }
-    record({ request, ref, reasonCodes: policy.reasonCodes, action: policy.action, hostDecision: host, observation })
+    record({ request, ref, truncatedPaths: truncated, reasonCodes: policy.reasonCodes, action: policy.action, hostDecision: host, observation })
     return toPreTool(resolution.decision)
   }
 
@@ -432,6 +470,8 @@ export function mountJey(ctx: Context, raw: unknown, deps: JeyMountDeps): JeyRun
 
   const resultOff = ctx.on('tools/result', (exec, result) => {
     sequence += 1
+    recentResults.push({ toolName: exec.name, status: result.isError ? 'failed' : 'succeeded' })
+    if (recentResults.length > HISTORY_CAP) recentResults.shift()
     runtime.progress = observeCall(runtime.progress, {
       toolName: exec.name,
       normalizedArguments: exec.arguments as JsonValue,

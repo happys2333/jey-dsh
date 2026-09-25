@@ -18,7 +18,13 @@ export const PROBE_TOOL_NOTE = 'probe-note-1'
 
 function toolCallChunks(): StreamChunk[] {
   const id = ToolCallId('probe-call-1')
-  const args = JSON.stringify({ note: PROBE_TOOL_NOTE })
+  // JEY_PROBE_ARG_KEYS makes the call carry a wide *structure* instead of a short note,
+  // so a host test can drive the request genuinely past a state byte budget. Shortening
+  // leaves cannot help a structure, which is what the insufficient-context path is about.
+  const wide = Number(process.env.JEY_PROBE_ARG_KEYS ?? 0)
+  const args = wide > 0
+    ? JSON.stringify(Object.fromEntries(Array.from({ length: wide }, (_, i) => [`k${i}`, 'v'])))
+    : JSON.stringify({ note: PROBE_TOOL_NOTE })
   return [
     { type: 'block-start', index: 0, blockType: 'tool-call' },
     { type: 'tool-call-delta', index: 0, id, name: PROBE_TOOL_NAME, argumentsDelta: args },

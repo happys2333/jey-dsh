@@ -63,19 +63,19 @@ shadow 下放过同一件事，两层就会互相矛盾。核心里 `evaluatePol
 ```sh
 pnpm install                          # 成功，含真实 DSH 包
 pnpm -r typecheck                     # 0 error（strict + noUncheckedIndexedAccess + exactOptionalPropertyTypes）
-pnpm --filter jey-core test           # 122 tests, 122 pass, 0 fail
+pnpm --filter jey-core test           # 137 tests, 137 pass, 0 fail
 pnpm --filter jey-core test:property  # 16 properties, 16 pass, 0 fail
-pnpm --filter jey-adapter-dsh test    # 7 宿主测试, 7 pass, 0 fail（真实 agent loop，离线无密钥）
+pnpm --filter jey-adapter-dsh test    # 21 宿主测试, 21 pass, 0 fail（真实 agent loop，离线无密钥）
 ```
 
 | gate | 状态 | 覆盖 |
 |---|---|---|
 | typecheck | **PASS** | contracts + core + adapter-dsh，无 `any` 兜底，无 `@ts-ignore` |
-| unit | **PASS** | 122 条：策略表 1 全 16 格与 absorbing 行、取消优先、必需题缺失、未校准不得 deny、陈旧快照、off/shadow 惰性；外发 deny 默认、精确 origin、allowlist 条件、调用方不得指定传输参数；边界校验路径收集；快照绑定与新鲜度；字节预算裁剪；无进展计数；固定模板与能力预检；生命周期与队列；配置结构与矛盾组合；审计记录结构、隐私由字段集合而非脱敏保证、单次写者有界轮转、崩溃后撕裂末行只隔离不改写、键控摘要 |
+| unit | **PASS** | 137 条：策略表 1 全 16 格与 absorbing 行、取消优先、必需题缺失、未校准不得 deny、陈旧快照、off/shadow 惰性；外发 deny 默认、精确 origin、allowlist 条件、调用方不得指定传输参数；边界校验路径收集；快照绑定与新鲜度；字节预算裁剪；无进展计数；固定模板与能力预检；生命周期、队列、配额账本与拒绝/归还；配置结构与矛盾组合；审计记录结构、隐私由字段集合而非脱敏保证、单次写者有界轮转、崩溃后撕裂末行只隔离不改写、键控摘要 |
 | property | **PASS** | Jey 永不放宽宿主决定；`allow` 只可能来自 `allow`+`abstain`；shadow/off 惰性；无观测时 enforce 不 abstain；放行必经已配置 origin；裁剪后必为合法 JSON、不超预算、有记录、受保护段不被整段丢弃；暂停路径不会重获失败预算 |
-| M1 完成度 | **PARTIAL** | 见下"未开始"。已交付的模块本身 gate 为 PASS，不等同于 M1 整体完成 |
-| 已实现模块 | — | `policy.ts`（§7.2）、`egress.ts`（§5.3）、`validate.ts`（§6.1）、`snapshot.ts`（§4.2/§10.1）、`truncation.ts`（§5.2）、`progress.ts`（§9）、`questions.ts`（§7.1/§8.1）、`coordinator.ts`（§4.4/§10.1/§10.2）、`config.ts` + `config/config.schema.json`（§13、附录 4）、`audit.ts`（§11、§5.4、§4.1 三段分离的 `recordDecision`、`AuditJournal`、`scanJournal`）、`canonical.ts` |
-| 未开始 | **NOT_RUN** | 按会话公平性与 §10.4 的 turn/session 配额执行（上限已在配置里声明但还没落地执行）、`AuditJournal` 的落盘 sink（属 adapter：文件、轮转、权限）、DSH 工具 schema 子集映射（属 adapter，M2） |
+| **M1** | **PASS** | `tasks.json` 要求的三件交付物齐了：`packages/contracts`、`packages/core`、`config/config.schema.json`；typecheck / unit / property 三个 gate 全绿 |
+| 已实现模块 | — | `policy.ts`（§7.2）、`egress.ts`（§5.3）、`validate.ts`（§6.1）、`snapshot.ts`（§4.2/§10.1）、`truncation.ts`（§5.2）、`progress.ts`（§9）、`questions.ts`（§7.1/§8.1）、`coordinator.ts`（§4.4/§10.1/§10.2/§10.4）、`budget.ts`（§10.4 预留-归还账本）、`config.ts` + `config/config.schema.json`（§13、附录 4）、`audit.ts`（§11、§5.4、§4.1 三段分离）、`canonical.ts` |
+| 本轮接线 | — | 裁剪真正进请求路径：`maxStateBytes` 在提交前生效，策略与本次调用放不下就 `INSUFFICIENT_CONTEXT` 不送问；`perTurnCalls`/`perSessionCalls` 从"配置里有"变成协调器真的执行并如实拒绝；队列按会话轮转，单会话最多排 `maxQueuePerSession` 个；审计事件新增 `truncatedPaths`，被裁掉什么必须看得见 |
 
 ## 过程中发现并修掉的真实缺陷
 
@@ -93,7 +93,11 @@ pnpm --filter jey-adapter-dsh test    # 7 宿主测试, 7 pass, 0 fail（真实 
 12. **`referenceDigest` 用字符串长度判熵是错的**：一份 `{path:"a.txt"}` 的 sha256 是 71 字符的"高熵字符串"，却仍然承诺着一个一次就能猜中的内容。测试断言"hmac 前缀"时失败才暴露。改成一律要求密钥——摘要的输入有多少熵只有调用者知道，这个函数不该替它猜。
 13. 自查时抓到的两处自我坑陷：`DECISION_KEYS` 被我写成 `fieldCheck({...})` 的返回值（那个函数返回的是问题列表而不是键名，会让未知字段检查整体失效）；`AuditJournal.#counters` 用只读接口类型标注后无法自增，而 `readonly` 元组让 `.includes(string)` 通不过类型检查。
 
-另记：一次用 shell 打补丁的操作有 3 处替换静默没生效却报告成功，靠 grep 复核才发现；此后同类改动一律用编辑器改并回读确认。
+14. **会话配额按 agent 键控**：`sessionKey` 原本是 `session:${sessionId}/${agentId}`，等于每个子 agent 都带一份新的会话额度，`perSessionCalls` 上限形同虚设。写账本单测时才暴露，改成只按 sessionId 键控。
+15. 公平性上限一开始是我推导出来的公式（`min(maxQueue, maxConcurrent)`），结果在 `maxConcurrent = 1` 时每个会话最多只能排 1 个，轮转策略**永远观察不到差异**——测试无论如何都会绿。改成协调器的显式参数 `maxQueuePerSession`，让策略本身可测。
+16. 我在截断路径的宿主测试里断言了"shadow 下工具体照常执行"，实际没执行——原因是我把参数撑宽后违反了探针工具自己的 schema，宿主在 Jey 之前就拒了。这是个无关原因造成的"假失败"，去掉该断言并写明：拒自 Jey 还是拒自宿主，看审计记录的 `reasonCodes` 就能分辨。
+
+另记：一次用 shell 打补丁的操作有 3 处替换静默没生效却报告成功，靠 grep 复核才发现；此后同类改动一律用编辑器改并回读确认。（本轮 8 处同构替换仍走了 `perl`，因为它不含引号且改完立刻 grep 计数与 typecheck 复核——记录在这里以免被当成上一轮的复发。）
 
 这些都属于“看起来通过、实际不安全”一类，记录在此以便复核。
 

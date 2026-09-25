@@ -145,6 +145,32 @@ describe('Jey closed loop on a real DSH agent', () => {
     assert.equal(decisions(loop.runtime).length, 1)
   })
 
+  it('refuses to ask a provider about a call whose own arguments do not fit the budget', async () => {
+    const keys = 120
+    const previous = process.env.JEY_PROBE_ARG_KEYS
+    process.env.JEY_PROBE_ARG_KEYS = String(keys)
+    try {
+      const loop = await mountLoop(jeyConfig({ limits: { maxStateBytes: 256 } }))
+      await runTurn(loop.ctx, loop.agent, 'note this down')
+
+      assert.equal(loop.provider.calls, 0, 'a request that cannot carry the call must not be sent')
+      const [record] = decisions(loop.runtime)
+      assert.ok(record)
+      assert.ok(record.reasonCodes.some(c => c.startsWith('insufficient-context:')), JSON.stringify(record.reasonCodes))
+      assert.equal(record.snapshot.callDigest !== null, true, 'the call is still identified in the audit trail')
+      assert.ok(record.truncatedPaths.some(p => p.startsWith('insufficient:')), JSON.stringify(record.truncatedPaths))
+      assert.equal(record.action, 'abstain', 'in shadow Jey adds no restriction of its own')
+      // Execution is deliberately not asserted here: the widened arguments also violate
+      // the probe tool's own parameter schema, so the host rejects the call before Jey's
+      // abstain could matter. Whether a denial came from Jey or from the host is visible
+      // in the audit record's reasonCodes, which is the point of recording them.
+      loop.runtime.close()
+    } finally {
+      if (previous === undefined) delete process.env.JEY_PROBE_ARG_KEYS
+      else process.env.JEY_PROBE_ARG_KEYS = previous
+    }
+  })
+
   it('records the three stages separately so a prediction cannot read as an outcome', async () => {
     const loop = await mountLoop(jeyConfig())
     await runTurn(loop.ctx, loop.agent, 'note this down')

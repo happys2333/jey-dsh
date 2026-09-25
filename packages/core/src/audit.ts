@@ -39,6 +39,8 @@ export interface AuditEvent {
   readonly failureCode: string | null
   readonly egressOccurred: boolean
   readonly stale: boolean
+  /** Which parts of the decision state were cut to fit the byte budget (spec 4.2). */
+  readonly truncatedPaths: readonly string[]
   readonly at: number
 }
 
@@ -80,7 +82,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 const DECISION_KEYS = [
   'kind', 'auditId', 'requestId', 'sessionId', 'agentId', 'providerKind', 'synthetic', 'resolvedModel',
   'templateDigest', 'snapshot', 'timing', 'questionStatuses', 'action', 'reasonCodes', 'hostDecision',
-  'execution', 'failureCode', 'egressOccurred', 'stale', 'at',
+  'execution', 'failureCode', 'egressOccurred', 'stale', 'truncatedPaths', 'at',
 ] as const
 
 const DIAGNOSTIC_KEYS = ['kind', 'auditId', 'requestId', 'sessionId', 'reason', 'at'] as const
@@ -306,6 +308,8 @@ export interface DecisionRecord {
   readonly hostDecision: HostDecision | null
   readonly execution: ExecutionOutcome | null
   readonly stale: boolean
+  /** Which parts of the decision state were cut to fit the byte budget. */
+  readonly truncatedPaths?: readonly string[]
   /** Key for publishing argument digests; null keeps them out of the log entirely. */
   readonly auditKey?: string | null
   readonly at?: number
@@ -350,6 +354,7 @@ export function recordDecision(input: DecisionRecord): AuditEvent {
     failureCode: execution?.failureCode ?? null,
     egressOccurred: response.egress.occurred,
     stale,
+    truncatedPaths: input.truncatedPaths ?? [],
     at: input.at ?? Date.now(),
   }
 }
