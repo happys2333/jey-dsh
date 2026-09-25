@@ -52,7 +52,7 @@ class ScriptedProvider implements DecisionProvider {
   calls = 0
   aborted = 0
   closed = 0
-  readonly seen: { requestId: string; signalAborted: boolean }[] = []
+  readonly seen: { requestId: string; signalAborted: boolean; request: DecisionRequest }[] = []
   readonly behaviour: Behaviour
 
   constructor(behaviour: Behaviour) { this.behaviour = behaviour }
@@ -65,7 +65,7 @@ class ScriptedProvider implements DecisionProvider {
     const index = this.calls++
     context.signal.addEventListener('abort', () => { this.aborted += 1 }, { once: true })
     return this.behaviour(index, request, context.signal).then(r => {
-      this.seen.push({ requestId: request.requestId, signalAborted: context.signal.aborted })
+      this.seen.push({ requestId: request.requestId, signalAborted: context.signal.aborted, request })
       return r
     })
   }
@@ -231,6 +231,43 @@ test('closing stops admission, cancels what is queued and closes the provider', 
   assert.deepEqual(await running, { kind: 'cancelled' })
   gate.resolve(response(request('a')))
   assert.deepEqual(await c.submit(request('c'), { signal: new AbortController().signal }), { kind: 'closed' })
+})
+
+test('the coordinator hands the provider only the deadline that is left', async () => {
+  const gate = deferred()
+  let calls = 0
+  const provider = new ScriptedProvider(async (_i, req) => {
+    calls += 1
+    return calls === 1 ? gate.promise : response(req)
+  })
+  let clock = 0
+  const c = new DecisionCoordinator(provider, {
+    limits: { maxConcurrent: 1, maxQueue: 4, deadlineMs: 200, perTurnCalls: 64, perSessionCalls: 512, maxQueuePerSession: 2 },
+    now: () => clock,
+  })
+  const running = c.submit(request('d1'), { signal: new AbortController().signal })
+  const queued = c.submit(request('d2'), { signal: new AbortController().signal })
+  clock = 150
+  gate.resolve(response(request('d1')))
+  await running
+  assert.equal((await queued).kind, 'response')
+
+  const outbound = provider.seen[1]?.request
+  assert.ok(outbound, 'the queued request should have reached the provider')
+  assert.equal(outbound.budget.maxElapsedMs, 50, 'queue time is charged to the request that waited')
+  assert.equal(request('d2').budget.maxElapsedMs, 500, 'the caller keeps its own request object')
+})
+
+test('a deadline spent during the provider call is reported as an inference timeout', async () => {
+  const never = new Promise<never>(() => {})
+  const provider = new ScriptedProvider(() => never)
+  let clock = 0
+  const c = new DecisionCoordinator(provider, {
+    limits: { maxConcurrent: 2, maxQueue: 4, deadlineMs: 20, perTurnCalls: 64, perSessionCalls: 512, maxQueuePerSession: 2 },
+    now: () => clock,
+  })
+  const outcome = await c.submit(request('slow'), { signal: new AbortController().signal })
+  assert.deepEqual(outcome, { kind: 'timed-out', stage: 'inference' })
 })
 
 test('the lifecycle table is closed at the end and rejects skips', () => {

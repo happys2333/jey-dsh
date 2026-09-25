@@ -23,6 +23,7 @@ export {
 export {
   parseDecisionRequest,
   parseDecisionResponse,
+  isErrorCode,
   ValidationError,
 } from './validate.ts'
 

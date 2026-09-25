@@ -1,5 +1,6 @@
 import type { DecisionProvider, DecisionRequest, DecisionResponse, ErrorCode, HostDecision, PolicyDecision, SnapshotRef } from 'jey-contracts'
 import { isFresh } from './snapshot.ts'
+import { isErrorCode } from './validate.ts'
 import { combineHostAndJey } from './policy.ts'
 import { EMPTY_BUDGET, keyOf, refundBudget, reserveBudget, type BudgetLedger } from './budget.ts'
 
@@ -314,6 +315,25 @@ export class DecisionCoordinator {
       return { kind: 'timed-out', stage: 'queue' }
     }
 
+    // The queue is the only party that knows how much of the deadline has already gone,
+    // so it narrows the budget here; a provider may tighten further but never widen.
+    const remainingMs = this.#limits.deadlineMs - (this.#now() - startedAt)
+    if (remainingMs <= 0) {
+      this.#release()
+      this.#budget = refundBudget(this.#budget, keyOf(run.request))
+      run.to('timed_out').to('recorded')
+      this.#settled.add(run.key)
+      this.#pump()
+      return { kind: 'timed-out', stage: 'inference' }
+    }
+    const outbound: DecisionRequest = {
+      ...run.request,
+      budget: {
+        maxElapsedMs: Math.min(run.request.budget.maxElapsedMs, remainingMs),
+        maxInputBytes: run.request.budget.maxInputBytes,
+      },
+    }
+
     run.to('running')
     // One combined signal: giving up locally also stops the provider's work, so a
     // discarded answer cannot keep burning a GPU slot forever (10.2).
@@ -327,7 +347,7 @@ export class DecisionCoordinator {
     // Waiting *for* the provider to notice its cancellation would let a hung call hold
     // the slot and never deliver an outcome at all.
     let finished = false
-    const inflight = this.#provider.evaluate(run.request, { signal: local.signal })
+    const inflight = this.#provider.evaluate(outbound, { signal: local.signal })
     // `closed` counts as cancellation, not as a deadline miss.
     inflight.then(
       () => { if (finished) this.#onDiagnostic({ key: run.key, kind: signal.aborted || this.#closed ? 'cancelled-after-answer' : 'timeout-after-answer' }) },
@@ -363,7 +383,7 @@ export class DecisionCoordinator {
       }
       this.#settled.add(run.key)
       return { kind: 'response', response, application: this.#guard(run) }
-    } catch {
+    } catch (e) {
       finished = true
       const stopped = signal.aborted || this.#closed
       if (stopped) run.to('cancelled')
@@ -371,7 +391,15 @@ export class DecisionCoordinator {
       else run.to('failed')
       run.to('recorded')
       this.#settled.add(run.key)
-      return stopped ? { kind: 'cancelled' } : local.signal.aborted ? { kind: 'timed-out', stage: 'inference' } : { kind: 'failed', code: 'PROVIDER_ERROR' }
+      if (stopped) return { kind: 'cancelled' }
+      if (local.signal.aborted) return { kind: 'timed-out', stage: 'inference' }
+      // A provider that names its failure gets to keep that name. Flattening
+      // LOCAL_NOT_READY, AUTH and EGRESS_DENIED into one generic code would throw away
+      // exactly the distinction the policy layer and an operator need.
+      const named = e instanceof Error && 'code' in e && isErrorCode((e as { code: unknown }).code)
+        ? (e as { code: ErrorCode }).code
+        : 'PROVIDER_ERROR'
+      return { kind: 'failed', code: named }
     } finally {
       clearTimeout(timer)
       signal.removeEventListener('abort', onAbort)

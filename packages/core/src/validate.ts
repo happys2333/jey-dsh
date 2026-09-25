@@ -145,6 +145,11 @@ const ERROR_CODES: readonly ErrorCode[] = ['INVALID_INPUT', 'UNSUPPORTED_CAPABIL
   'OVERLOADED', 'TIMEOUT', 'CANCELLED', 'QUEUE_FULL', 'BUDGET_EXCEEDED', 'INVALID_RESPONSE',
   'INSUFFICIENT_CONTEXT', 'STALE_SNAPSHOT', 'LOCAL_NOT_READY', 'EGRESS_DENIED']
 
+/** Lets a coordinator carry a provider's own classification instead of flattening it. */
+export function isErrorCode(value: unknown): value is ErrorCode {
+  return typeof value === 'string' && (ERROR_CODES as readonly string[]).includes(value)
+}
+
 function parseAnswer(value: unknown, path: string): Answer {
   const out: string[] = []
   if (!isObj(value)) fail('INVALID_RESPONSE', [path], 'answer')
