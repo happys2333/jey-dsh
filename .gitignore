@@ -7,3 +7,7 @@ artifacts/eval/
 .local/
 *.log
 .DS_Store
+python/.venv/
+python/.cache/
+*.egg-info/
+__pycache__/

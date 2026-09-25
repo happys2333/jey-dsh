@@ -59,6 +59,9 @@ importers:
       jey-core:
         specifier: workspace:*
         version: link:../core
+      jey-provider-local:
+        specifier: workspace:*
+        version: link:../provider-local
       jey-provider-typesafe:
         specifier: workspace:*
         version: link:../provider-typesafe
@@ -84,6 +87,22 @@ importers:
       fast-check:
         specifier: 4.2.0
         version: 4.2.0
+
+  packages/provider-local:
+    dependencies:
+      jey-contracts:
+        specifier: workspace:*
+        version: link:../contracts
+      jey-core:
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: 22.19.1
+        version: 22.19.1
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
 
   packages/provider-typesafe:
     dependencies:
