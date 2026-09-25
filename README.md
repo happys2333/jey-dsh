@@ -15,7 +15,8 @@ pnpm install
 pnpm -r build && pnpm -r typecheck   # 类型合同
 pnpm --filter jey-core test          # 137 条单元
 pnpm --filter jey-core test:property # 16 条属性
-pnpm --filter jey-adapter-dsh test  # 21 条：真实 agent loop 上的宿主闭环与装载入口
+pnpm --filter jey-adapter-dsh test      # 22 条：真实 agent loop 上的宿主闭环、装载入口与外发拒绝
+pnpm --filter jey-provider-typesafe test # 20 条：云端线格式契约，夹具来自官方文档，全程不联网
 ```
 
 真实状态逐条记在 `docs/STATUS.md`，未运行的项一律写 `NOT_RUN`/`BLOCKED`，不用工程测试通过冒充模型质量合格。

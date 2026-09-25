@@ -77,6 +77,22 @@ pnpm --filter jey-adapter-dsh test    # 21 宿主测试, 21 pass, 0 fail（真�
 | 已实现模块 | — | `policy.ts`（§7.2）、`egress.ts`（§5.3）、`validate.ts`（§6.1）、`snapshot.ts`（§4.2/§10.1）、`truncation.ts`（§5.2）、`progress.ts`（§9）、`questions.ts`（§7.1/§8.1）、`coordinator.ts`（§4.4/§10.1/§10.2/§10.4）、`budget.ts`（§10.4 预留-归还账本）、`config.ts` + `config/config.schema.json`（§13、附录 4）、`audit.ts`（§11、§5.4、§4.1 三段分离）、`canonical.ts` |
 | 本轮接线 | — | 裁剪真正进请求路径：`maxStateBytes` 在提交前生效，策略与本次调用放不下就 `INSUFFICIENT_CONTEXT` 不送问；`perTurnCalls`/`perSessionCalls` 从"配置里有"变成协调器真的执行并如实拒绝；队列按会话轮转，单会话最多排 `maxQueuePerSession` 个；审计事件新增 `truncatedPaths`，被裁掉什么必须看得见 |
 
+## M3 提供方
+
+```sh
+pnpm --filter jey-provider-typesafe test  # 20 条契约测试, 20 pass, 0 fail（无网络、无凭据）
+```
+
+| gate | 状态 | 说明 |
+|---|---|---|
+| provider-contract（typesafe） | **PASS** | 线格式逐字取自官方 API 文档（2026-09-23 检索）；出站体断言、`answers` 回镜键集断言、每个 primitive 的取值/键集/求和/一致性断言、403-vs-401、429/529 可重试、3xx 拒绝跟随、取消真的打断出站请求 |
+| 隐私边界 | **PASS** | `snapshot/purpose/budget/requestId` 不出站；凭据缺失时 fetch 调用数为 0；token 不出现在任何错误文本里；审计只记别名不记 URL |
+| cloud-inference | **BLOCKED** | 无 `TYPESAFE_API_KEY`、无调用预算。20 条全是对夹具与桩传输的契约测试，**不是**真实调用记录 |
+| provider-contract（local） | **NOT_RUN** | `jey-provider-local` 与 `python/local_decider` 还没写 |
+| local-inference / local-offline | **BLOCKED** | 缺 Python 环境与权重授权（约 3.01 GB，且启动需取固定 tokenizer） |
+
+v1 明确**不重试**：重试只能有一层负责，协调器与提供方同时重试会让请求数相乘。代价是限流会表现为一次失败的检查，由策略层按"必需检查不可用"升级，而不是被静默吞掉。
+
 ## 过程中发现并修掉的真实缺陷
 
 1. **shadow 不惰性**：概率分支（conflict/goal/evidence）没有检查 mode，`shadow` 下仍会产出 `ask`/`deny`。属性测试在 1000 次随机输入下命中；此前的单元测试因为固定了 `snapshotFresh: false` 而走进提前返回、把它掩盖了。修法是把 mode 处理从各分支上移到唯一出口，使不变量成为结构性事实。

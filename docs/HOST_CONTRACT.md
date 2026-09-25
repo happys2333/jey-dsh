@@ -115,6 +115,17 @@ export interface LlmCallConfig { provider; model; reasoningEffort?; temperature?
 约束：需 Python ≥3.10；`--model/--revision` 即使走 `--gguf` 也必填，`llamacpp_backend.py:227` 会 import `transformers` 取固定参考 tokenizer，因此**启动阶段需要 HF 可访问 `Qwen/Qwen3.5-4B@851bf6e8…`**；CPU 最小权重约 3.01 GB（`bartowski/Qwen_Qwen3.5-4B-GGUF@4168f45a…`）。
 本机状态：无 Python，但有 `uv 0.11.32` → Python 3.10+ 可按需装。权重下载属外发动作，需明确授权后才做。
 
+## 8.1 已按实测修正的适配细节（M3）
+
+写 `jey-provider-typesafe` 时逐字用了官方文档的响应示例，并据此确定：
+
+- 请求体 `questions` 是**以我方 id 为键的 map**，每题 `{type, instructions, criteria}`；`criteria` 按 primitive 变形（noul 可省、choice 是 id→评分说明的 map 且 ≤255、score 是 2–10 项的有序数组）。
+- 响应是 `{model, answers, usage}`，`answers` 按同一批 id 回镜；`usage` 只有 `input_tokens`/`output_tokens`，**没有任何费用字段** → `costUsd` 记 `null`、`costBasis` 记 `unknown`。
+- noul **没有** `confidence`；choice/score 有。适配器对 noul 上出现的 `confidence` 直接拒绝，因为那意味着线格式变了。
+- 缺凭据在现网是 **403**，文档写 401，两者都按 `AUTH` 处理。
+- 3xx 一律拒绝跟随：一个被允许的 origin 不该能把我们的 state 转交给另一个 origin。
+- v1 **不重试**：重试只能有一层负责，协调器与提供方同时重试会让请求数相乘，而重复请求即使输出免费也照样有代价。因此限流表现为一次失败的检查，由策略层升级处理而不是被悄悄吞掉。
+
 ## 9. MCP 版本决定
 
 `modelcontextprotocol.io/specification/2025-11-25/server/tools` 存在且核实（`inputSchema` 必填、`outputSchema` 可选、结构化结果在 `structuredContent`；协议错误用 JSON-RPC 码如 `-32602`，工具执行错误用 `isError: true`）。但已发布日期版本含 **`2026-07-28`（current）**，`2025-11-25` 已被取代。→ 需要 ADR 决定固定哪一版；本文件先按交接包指定的 `2025-11-25` 实现并记录差异。
