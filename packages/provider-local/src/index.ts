@@ -36,7 +36,6 @@ export interface LocalOptions {
   readonly endpoint: string
   readonly token: () => string | undefined
   readonly maxRequestBytes?: number
-  readonly requestTimeoutMs?: number
   readonly fetchImpl?: typeof globalThis.fetch
   /** Injectable monotonic clock, so deadline arithmetic is testable without sleeping. */
   readonly now?: () => number
