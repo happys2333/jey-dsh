@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "1",
+  "mode": "enforce",
+  "provider": {
+    "kind": "local",
+    "local": {
+      "endpoint": "http://127.0.0.1:8732",
+      "tokenRef": "env:JEY_LOCAL_TOKEN",
+      "ownership": "external",
+      "expectedModel": {
+        "requested": "bartowski/Qwen_Qwen3.5-4B-GGUF",
+        "revision": "4168f45a16a1290d65a4ec0fa312ae917a4c15d6",
+        "weightsDigest": "sha256:13c16f426047e2de38cd075bdade4a7bcbc8c774384876f677740cda65f8a983",
+        "tokenizerRevision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+        "quantization": "Q4_K_M"
+      }
+    }
+  },
+  "egress": {
+    "mode": "local-only",
+    "allowedOrigins": ["http://127.0.0.1:8732"],
+    "allowedPurposes": ["tool-assessment"]
+  },
+  "limits": {
+    "deadlineMs": 10000
+  },
+  "features": {
+    "toolAssessment": true
+  },
+  "audit": {}
+}
