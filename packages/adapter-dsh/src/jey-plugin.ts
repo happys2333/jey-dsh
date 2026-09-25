@@ -11,6 +11,7 @@ import {
   type AuditEvent, type HostCapabilities, type JeyConfig, type LineSink, type ProgressStore, type StateSection,
 } from 'jey-core'
 import { MockProvider } from './providers/mock.ts'
+import { ExpectedProvider } from './identity.ts'
 import { TypesafeProvider } from 'jey-provider-typesafe'
 import { LocalProvider } from 'jey-provider-local'
 
@@ -558,8 +559,12 @@ function providerFor(raw: unknown): DecisionProvider {
     if (local === undefined) throw new Error('jey: provider.kind=local without a local block')
     // External ownership only: Jey never launches, restarts, or downloads anything to
     // satisfy a decision. An unreachable service answers LOCAL_NOT_READY and the policy
-    // layer escalates, rather than the plugin quietly failing open.
-    return new LocalProvider({ endpoint: local.endpoint, token: () => resolveCredential(local.tokenRef) })
+    // layer escalates, rather than the plugin quietly failing open. And the checkpoint it
+    // names has to be the one the operator pinned, checked before any state is sent.
+    return new ExpectedProvider(
+      new LocalProvider({ endpoint: local.endpoint, token: () => resolveCredential(local.tokenRef) }),
+      local.expectedModel,
+    )
   }
   if (provider.kind === 'typesafe') {
     const typesafe = provider.typesafe
