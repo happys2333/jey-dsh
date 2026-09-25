@@ -122,12 +122,37 @@ test('score expectedIndex must fit the distribution', () => {
   const bad = [{
     id: 'rank', status: 'answered',
     answer: {
-      kind: 'score', expectedIndex: 5, levels: ['low', 'high'], probabilities: { low: 0.5, high: 0.5 },
+      kind: 'score', expectedIndex: 5, levels: ['low', 'high'], probabilities: { 0: 0.5, 1: 0.5 },
       probability: { origin: 'provider-distribution', calibration: 'uncalibrated', calibrationId: null },
     },
   }]
   assert.throws(() => parseDecisionResponse(responseWith(bad)), (e: unknown) =>
     e instanceof ValidationError && e.paths.includes('outcomes[0].answer.expectedIndex'))
+})
+
+test('score expectedIndex is an expectation, so a fractional value is legal', () => {
+  const answer = {
+    kind: 'score', expectedIndex: 1.05, levels: ['low', 'mid', 'high'],
+    probabilities: { 0: 0.45, 1: 0.5, 2: 0.05 },
+    probability: { origin: 'native-logits', calibration: 'uncalibrated', calibrationId: null },
+  }
+  const out = parseDecisionResponse(responseWith([{ id: 'rank', status: 'answered', answer }]))
+  assert.equal(out.outcomes[0]?.status, 'answered')
+  assert.equal((out.outcomes[0] as { answer: { expectedIndex: number } }).answer.expectedIndex, 1.05)
+  assert.throws(() => parseDecisionResponse(responseWith([{
+    id: 'rank', status: 'answered', answer: { ...answer, expectedIndex: Number.NaN },
+  }])), ValidationError)
+})
+
+test('score distribution keys are level indices, not level labels', () => {
+  assert.throws(() => parseDecisionResponse(responseWith([{
+    id: 'rank', status: 'answered',
+    answer: {
+      kind: 'score', expectedIndex: 0.5, levels: ['low', 'high'], probabilities: { low: 0.5, high: 0.5 },
+      probability: { origin: 'native-logits', calibration: 'uncalibrated', calibrationId: null },
+    },
+  }])), (e: unknown) =>
+    e instanceof ValidationError && e.paths.includes('outcomes[0].answer.probabilities'))
 })
 
 test('error outcomes must use a known code and explicit retryability', () => {

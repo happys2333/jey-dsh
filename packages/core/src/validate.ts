@@ -173,10 +173,17 @@ function parseAnswer(value: unknown, path: string): Answer {
     }
     if ('calibratedProbabilities' in a && !probOk(a.calibratedProbabilities)) out.push(`${path}.calibratedProbabilities`)
   } else if (a.kind === 'score') {
-    if (!isInt(a.expectedIndex)) out.push(`${path}.expectedIndex`)
+    // Σ(i×p_i) is an expectation, so it is fractional for nearly every real
+    // distribution. Requiring an integer here would reject what providers emit.
+    if (!isNum(a.expectedIndex) || a.expectedIndex < 0) out.push(`${path}.expectedIndex`)
     if (!Array.isArray(a.levels) || !a.levels.every(l => typeof l === 'string')) out.push(`${path}.levels`)
     if (!probOk(a.probabilities)) out.push(`${path}.probabilities`)
-    else if (typeof a.expectedIndex === 'number' && a.expectedIndex >= Object.keys(a.probabilities).length) {
+    else if (Array.isArray(a.levels) && Object.keys(a.probabilities).length !== a.levels.length) {
+      out.push(`${path}.probabilities`)
+    } else if (Object.keys(a.probabilities).some((key, i) => key !== String(i))) {
+      // Keys are level indices, not level labels, or two providers disagree about nothing.
+      out.push(`${path}.probabilities`)
+    } else if (isNum(a.expectedIndex) && a.expectedIndex >= Object.keys(a.probabilities).length) {
       out.push(`${path}.expectedIndex`)
     }
   } else {
